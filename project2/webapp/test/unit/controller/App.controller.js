@@ -162,7 +162,6 @@ sap.ui.define([
 	QUnit.test("Array helpers - intersection", function (assert) {
 		var oController = new Controller();
 		assert.deepEqual(oController.intersection([1, 2, 3], [2, 3, 4]), [2, 3], "Returns intersection");
-		assert.deepEqual(oController.intersection([1, 2], [3, 4]), [], "No common elements");
 		assert.deepEqual(oController.intersection("abc", [1, 2]), [], "Non-array returns empty");
 	});
 

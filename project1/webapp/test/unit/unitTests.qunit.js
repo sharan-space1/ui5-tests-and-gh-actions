@@ -23,38 +23,57 @@ function generateHash(module, testName) {
     return hex.slice(-8);
 }
 
-const internalTestIds = [];
+const internalModuleIds = [];
 
-// Read from window.CHANGED_TESTS (injected by CI) or use local defaults
-// In CI: window.CHANGED_TESTS will be set by build pipeline
-// Locally: falls back to hardcoded changeLogs for development
-const changeLogs = window.CHANGED_TESTS || [
-    {
-        "module": "App Controller",
-        "test": "add should return sum of two numbers"
-    },
-    {
-        "module": "App Controller",
-        "test": "divide should return quotient of two numbers"
-    },
-    {
-        "module": "View1 Controller",
-        "test": "capitalize should capitalize first letter"
-    },
-    {
-        "module": "App Controller - Part 2 (Array & Date Operations)",
-        "test": "sum should return sum of array elements"
-    }
-];
+// Function to get URL parameter
+function getUrlParameter(name) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(name);
+}
 
-changeLogs.forEach(test => {
-    const testId = generateHash(test.module, test.test);
-    internalTestIds.push(testId);
+// Read module names from:
+// 1. URL parameter (?modules=App Controller,View1 Controller)
+// 2. window.TEST_MODULES (injected by CI)
+// 3. Fallback to hardcoded defaults for local development
+console.log("[unitTests.qunit.js] Starting module filter setup...");
+console.log("[unitTests.qunit.js] Current URL:", window.location.href);
+console.log("[unitTests.qunit.js] window.TEST_MODULES:", window.TEST_MODULES);
+
+const modulesParam = getUrlParameter('modules');
+console.log("[unitTests.qunit.js] URL modules parameter:", modulesParam);
+
+let moduleNames = [];
+
+if (modulesParam) {
+    // From URL parameter (comma-separated)
+    moduleNames = modulesParam.split(',').map(m => m.trim());
+    console.log("[unitTests.qunit.js] Using URL parameter modules:", moduleNames);
+} else if (window.TEST_MODULES) {
+    // From window variable (injected by CI)
+    moduleNames = window.TEST_MODULES;
+    console.log("[unitTests.qunit.js] Using window.TEST_MODULES:", moduleNames);
+}
+
+// Convert module names to internal IDs using hash function
+console.log("[unitTests.qunit.js] Converting module names to hash IDs...");
+moduleNames.forEach(module => {
+    const moduleId = generateHash(module);
+    console.log("[unitTests.qunit.js]   Module: '" + module + "' -> Hash: " + moduleId);
+    internalModuleIds.push(moduleId);
 });
 
-if (internalTestIds && internalTestIds.length > 0) {
-    QUnit.config.testId = internalTestIds;
+console.log("[unitTests.qunit.js] Final module IDs array:", internalModuleIds);
+
+if (internalModuleIds && internalModuleIds.length > 0) {
+    QUnit.config.moduleId = internalModuleIds;
+    console.log("[unitTests.qunit.js] ✓ Set QUnit.config.moduleId to:", internalModuleIds);
+    console.log("[unitTests.qunit.js] ✓ Will run tests ONLY for these modules:", moduleNames);
+} else {
+    console.log("[unitTests.qunit.js] ⚠ No module IDs set - will run ALL tests");
 }
+
+console.log("[unitTests.qunit.js] QUnit.config.moduleId:", QUnit.config.moduleId);
+console.log("[unitTests.qunit.js] ========================================");
 
 sap.ui.require([
     "unit/AllTests"

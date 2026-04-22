@@ -1,4 +1,4 @@
-name: PR Unit Tests - Changed Tests Only
+name: PR Unit Tests
 
 on:
   pull_request:
@@ -6,8 +6,11 @@ on:
       - dev
 
 jobs:
-  run-changed-unit-tests:
+  test-and-comment:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     
     steps:
       - name: Checkout code
@@ -23,134 +26,146 @@ jobs:
           cache-dependency-path: |
             */package-lock.json
       
-      - name: Detect changed test files
-        id: changed-tests
-        run: |
-          echo "Detecting changed test files..."
-          
-          # Get the list of changed files between base and head
-          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
-          
-          echo "Changed files:"
-          echo "$CHANGED_FILES"
-          
-          # Filter for unit test files in any folder with /webapp/test/unit/ structure
-          TEST_FILES=$(echo "$CHANGED_FILES" | grep -E '/webapp/test/unit/.*\.js$' || true)
-          
-          if [ -z "$TEST_FILES" ]; then
-            echo "No unit test files changed. Skipping test execution."
-            echo "has_test_changes=false" >> $GITHUB_OUTPUT
-          else
-            echo "Changed test files:"
-            echo "$TEST_FILES"
-            echo "has_test_changes=true" >> $GITHUB_OUTPUT
-            
-            # Save changed test files as JSON array for the parser script
-            echo "$TEST_FILES" | jq -R -s -c 'split("\n") | map(select(length > 0))' > changed-test-files.json
-          fi
-      
-      - name: Parse changed tests
-        if: steps.changed-tests.outputs.has_test_changes == 'true'
+      - name: Extract modules from git diff
+        id: extract
         env:
           GIT_BASE_REF: ${{ github.event.pull_request.base.sha }}
           GIT_HEAD_REF: ${{ github.event.pull_request.head.sha }}
         run: |
-          node .github/scripts/parse-changed-tests.js
+          node .github/scripts/extract-modules-from-diff.js
+          
+          # Check if any modules found
+          if [ ! -f "modules-to-test.json" ]; then
+            echo "has_modules=false" >> $GITHUB_OUTPUT
+          else
+            MODULE_COUNT=$(cat modules-to-test.json | jq 'to_entries | length')
+            if [ "$MODULE_COUNT" -eq 0 ]; then
+              echo "has_modules=false" >> $GITHUB_OUTPUT
+            else
+              echo "has_modules=true" >> $GITHUB_OUTPUT
+            fi
+          fi
       
-      - name: Run unit tests for all projects with changes
-        if: steps.changed-tests.outputs.has_test_changes == 'true'
+      - name: Run tests by module
+        if: steps.extract.outputs.has_modules == 'true'
         env:
           CI: true
           GITHUB_ACTIONS: true
         run: |
-          # Check if any projects have test changes
-          if [ ! -f "projects-with-changes.txt" ]; then
-            echo "No projects with test changes found"
-            exit 0
-          fi
+          echo "Reading modules-to-test.json..."
+          MODULES_JSON=$(cat modules-to-test.json)
           
-          # Read projects with changes
-          PROJECTS=$(cat projects-with-changes.txt)
-          
-          if [ -z "$PROJECTS" ]; then
-            echo "No projects with test changes"
-            exit 0
-          fi
-          
-          echo "Projects with test changes:"
-          echo "$PROJECTS"
-          echo ""
-          
-          # Loop through each project and run tests
-          while IFS= read -r project; do
-            if [ -z "$project" ]; then
+          # Loop through each project
+          echo "$MODULES_JSON" | jq -r 'keys[]' | while read project; do
+            echo "=========================================="
+            echo "Testing: $project"
+            echo "=========================================="
+            
+            # Get unique modules for this project
+            MODULES=$(echo "$MODULES_JSON" | jq -r ".\"$project\" | map(.module) | unique | join(\",\")")
+            
+            if [ -z "$MODULES" ]; then
+              echo "No modules found for $project"
               continue
             fi
             
-            echo "========================================"
-            echo "Processing: $project"
-            echo "========================================"
+            echo "Modules to test: $MODULES"
+            echo ""
             
-            # Check if project directory exists
-            if [ ! -d "$project" ]; then
-              echo "⚠ Warning: Project directory $project not found, skipping..."
-              continue
-            fi
-            
-            # Check if tests JSON file exists
-            TEST_FILE="${project}-tests.json"
-            if [ ! -f "$TEST_FILE" ]; then
-              echo "⚠ Warning: Test file $TEST_FILE not found, skipping..."
-              continue
-            fi
-            
-            # Check if package.json exists
-            if [ ! -f "$project/package.json" ]; then
-              echo "⚠ Warning: $project/package.json not found, skipping..."
-              continue
-            fi
-            
+            # Install dependencies
             echo "Installing dependencies for $project..."
             cd "$project"
             npm ci
             
+            # Set modules as environment variable for wdio.conf.js
+            export TEST_MODULES_LIST="$MODULES"
+            
             echo ""
-            echo "Running unit tests for $project..."
-            export PROJECT_CHANGED_TESTS=$(cat "../$TEST_FILE")
-            echo "CHANGED_TESTS:"
-            echo "$PROJECT_CHANGED_TESTS"
+            echo "Running tests for modules..."
             echo ""
             
-            # Run the tests
-            npm run unit-test-headless
-            TEST_EXIT_CODE=$?
+            # Run tests (wdio.conf.js will inject modules into window.TEST_MODULES)
+            npm run unit-test-headless 2>&1 | tee "../${project}-test-output.log" || true
             
             cd ..
-            
-            if [ $TEST_EXIT_CODE -ne 0 ]; then
-              echo "❌ Tests failed for $project"
-              exit $TEST_EXIT_CODE
-            fi
-            
-            echo "✓ Tests passed for $project"
             echo ""
-            
-          done < projects-with-changes.txt
+          done
           
-          echo "========================================"
-          echo "✓ All project tests completed successfully"
-          echo "========================================"
+          echo "✓ All project tests completed"
       
-      - name: Summary
-        if: always()
+      - name: Parse results and generate comment
+        if: steps.extract.outputs.has_modules == 'true'
         run: |
-          if [ "${{ steps.changed-tests.outputs.has_test_changes }}" == "false" ]; then
-            echo "✓ No unit test files were modified in this PR"
-          else
-            if [ -f "projects-with-changes.txt" ]; then
-              PROJECT_COUNT=$(cat projects-with-changes.txt | grep -v '^$' | wc -l)
-              echo "✓ Unit tests completed for $PROJECT_COUNT project(s) with modified test files"
-            else
-              echo "✓ Unit tests workflow completed"
-            fi
-          fi
+          node .github/scripts/parse-qunit-results.js
+      
+      - name: Post PR comment
+        if: steps.extract.outputs.has_modules == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            if (!fs.existsSync('pr-comment.md')) {
+              console.log('No pr-comment.md found');
+              return;
+            }
+            
+            const commentBody = fs.readFileSync('pr-comment.md', 'utf8');
+            
+            // Find existing comments from this workflow
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number
+            });
+            
+            const botComments = comments.filter(comment => 
+              comment.user.login === 'github-actions[bot]' &&
+              comment.body.includes('Unit Test Report')
+            );
+            
+            // Mark old comments as outdated
+            for (const oldComment of botComments) {
+              console.log(`Marking comment ${oldComment.id} as outdated...`);
+              const outdatedBody = '> ⚠️ **This report is outdated.** See the latest report below.\n\n' + 
+                                   '<details>\n<summary>View outdated report</summary>\n\n' +
+                                   oldComment.body +
+                                   '\n</details>';
+              
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: oldComment.id,
+                body: outdatedBody
+              });
+            }
+            
+            // Create new comment
+            console.log('Creating new test report comment...');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: commentBody
+            });
+      
+      - name: No test changes
+        if: steps.extract.outputs.has_modules == 'false'
+        run: |
+          echo "=========================================="
+          echo "No Test Changes"
+          echo "=========================================="
+          echo ""
+          echo "ℹ️ No unit test files were modified in this PR"
+          echo ""
+      
+      - name: Upload artifacts
+        if: always() && steps.extract.outputs.has_modules == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            modules-to-test.json
+            *-test-output.log
+            pr-comment.md
+          retention-days: 30

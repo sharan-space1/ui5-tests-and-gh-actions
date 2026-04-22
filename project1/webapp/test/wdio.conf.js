@@ -65,27 +65,35 @@ exports.config = {
     // Hooks
     // =======================
     before: function () {
-        // Inject CHANGED_TESTS from environment variable into browser context
-        const changedTests = process.env.PROJECT_CHANGED_TESTS;
+        console.log('[wdio.conf.js] ======================================');
+        console.log('[wdio.conf.js] Before hook executing...');
+        console.log('[wdio.conf.js] ======================================');
         
-        if (changedTests) {
-            console.log('Injecting CHANGED_TESTS into browser context...');
-            try {
-                const parsedTests = JSON.parse(changedTests);
-                console.log(`Found ${parsedTests.length} changed test(s) to run`);
-                
-                // Inject into browser's window object
-                browser.execute((tests) => {
-                    window.CHANGED_TESTS = tests;
-                }, parsedTests);
-                
-                console.log('✓ CHANGED_TESTS injected successfully');
-            } catch (error) {
-                console.error('Error parsing CHANGED_TESTS:', error.message);
-                console.log('Tests will run with default filter');
-            }
+        // Inject TEST_MODULES from environment variable into browser context
+        const modulesString = process.env.TEST_MODULES_LIST || "App Controller";
+        console.log('[wdio.conf.js] process.env.TEST_MODULES_LIST:', modulesString);
+        
+        if (modulesString) {
+            console.log('[wdio.conf.js] ✓ Found TEST_MODULES_LIST environment variable');
+            const modules = modulesString.split(',').map(m => m.trim());
+            console.log('[wdio.conf.js] Parsed modules array:', modules);
+            console.log('[wdio.conf.js] Module count:', modules.length);
+            
+            // Inject into browser's window object
+            console.log('[wdio.conf.js] Injecting into browser context as window.TEST_MODULES...');
+            browser.execute((mods) => {
+                console.log('[Browser Context] Received modules:', mods);
+                window.TEST_MODULES = mods;
+                console.log('[Browser Context] window.TEST_MODULES set to:', window.TEST_MODULES);
+            }, modules);
+            
+            console.log('[wdio.conf.js] ✓ TEST_MODULES injected successfully');
+            console.log('[wdio.conf.js] Modules to test:', modules.join(', '));
         } else {
-            console.log('No PROJECT_CHANGED_TESTS env variable found. Tests will run with default filter.');
+            console.log('[wdio.conf.js] ⚠ No TEST_MODULES_LIST env variable found');
+            console.log('[wdio.conf.js] Browser will use fallback modules from unitTests.qunit.js');
         }
+        
+        console.log('[wdio.conf.js] ======================================');
     }
 };
