@@ -71,10 +71,10 @@ function parseCoverageResults() {
             const fileCoverage = coverageData[coverageKey];
 
             // Calculate coverage percentages
-            const statements = calculateCoverage(fileCoverage.s, fileCoverage.statementMap);
-            const branches = calculateCoverage(fileCoverage.b, fileCoverage.branchMap);
-            const functions = calculateCoverage(fileCoverage.f, fileCoverage.fnMap);
-            const lines = calculateCoverage(fileCoverage.l || {}, {});
+            const statements = calculateStatementCoverage(fileCoverage.s);
+            const branches = calculateBranchCoverage(fileCoverage.b);
+            const functions = calculateFunctionCoverage(fileCoverage.f);
+            const lines = calculateLineCoverage(fileCoverage.s, fileCoverage.statementMap);
 
             console.log(`[parse-coverage]   ✓ ${file}: S:${statements.pct}% B:${branches.pct}% F:${functions.pct}% L:${lines.pct}%`);
 
@@ -95,17 +95,79 @@ function parseCoverageResults() {
 }
 
 /**
- * Calculate coverage percentage
+ * Calculate statement coverage
  */
-function calculateCoverage(hits, map) {
-    if (!hits || Object.keys(hits).length === 0) {
+function calculateStatementCoverage(statements) {
+    if (!statements || Object.keys(statements).length === 0) {
         return { pct: 0, covered: 0, total: 0 };
     }
-
-    const total = Object.keys(hits).length;
-    const covered = Object.values(hits).filter(count => count > 0).length;
+    const total = Object.keys(statements).length;
+    const covered = Object.values(statements).filter(count => count > 0).length;
     const pct = total > 0 ? Math.round((covered / total) * 100 * 100) / 100 : 0;
+    return { pct, covered, total };
+}
 
+/**
+ * Calculate branch coverage
+ */
+function calculateBranchCoverage(branches) {
+    if (!branches || Object.keys(branches).length === 0) {
+        return { pct: 0, covered: 0, total: 0 };
+    }
+    let total = 0;
+    let covered = 0;
+    
+    // Each branch has an array of paths [path1Hits, path2Hits, ...]
+    Object.values(branches).forEach(branchPaths => {
+        if (Array.isArray(branchPaths)) {
+            total += branchPaths.length;
+            covered += branchPaths.filter(hits => hits > 0).length;
+        }
+    });
+    
+    const pct = total > 0 ? Math.round((covered / total) * 100 * 100) / 100 : 0;
+    return { pct, covered, total };
+}
+
+/**
+ * Calculate function coverage
+ */
+function calculateFunctionCoverage(functions) {
+    if (!functions || Object.keys(functions).length === 0) {
+        return { pct: 0, covered: 0, total: 0 };
+    }
+    const total = Object.keys(functions).length;
+    const covered = Object.values(functions).filter(count => count > 0).length;
+    const pct = total > 0 ? Math.round((covered / total) * 100 * 100) / 100 : 0;
+    return { pct, covered, total };
+}
+
+/**
+ * Calculate line coverage from statements
+ */
+function calculateLineCoverage(statements, statementMap) {
+    if (!statements || !statementMap || Object.keys(statements).length === 0) {
+        return { pct: 0, covered: 0, total: 0 };
+    }
+    
+    const lineHits = {};
+    
+    // Map statements to lines
+    Object.keys(statements).forEach(stmtId => {
+        const stmt = statementMap[stmtId];
+        if (stmt && stmt.start && stmt.start.line) {
+            const line = stmt.start.line;
+            if (!lineHits[line]) {
+                lineHits[line] = 0;
+            }
+            lineHits[line] += statements[stmtId];
+        }
+    });
+    
+    const total = Object.keys(lineHits).length;
+    const covered = Object.values(lineHits).filter(hits => hits > 0).length;
+    const pct = total > 0 ? Math.round((covered / total) * 100 * 100) / 100 : 0;
+    
     return { pct, covered, total };
 }
 
@@ -125,10 +187,10 @@ function generateMarkdownTable(coverageResults) {
     ];
 
     coverageResults.forEach(result => {
-        const stmtBadge = formatBadge(result.statements.pct);
-        const branchBadge = formatBadge(result.branches.pct);
-        const fnBadge = formatBadge(result.functions.pct);
-        const lineBadge = formatBadge(result.lines.pct);
+        const stmtBadge = formatBadge(result.statements);
+        const branchBadge = formatBadge(result.branches);
+        const fnBadge = formatBadge(result.functions);
+        const lineBadge = formatBadge(result.lines);
 
         const fileName = result.file.length > 40 
             ? '...' + result.file.substring(result.file.length - 37) 
@@ -147,15 +209,18 @@ function generateMarkdownTable(coverageResults) {
 }
 
 /**
- * Format coverage percentage with badge/color
+ * Format coverage percentage with badge/color and counts
  */
-function formatBadge(pct) {
+function formatBadge(coverage) {
+    const pct = coverage.pct;
+    const counts = `(${coverage.covered}/${coverage.total})`;
+    
     if (pct >= 80) {
-        return `🟢 ${pct}%`;
+        return `🟢 ${pct}% ${counts}`;
     } else if (pct >= 50) {
-        return `🟡 ${pct}%`;
+        return `🟡 ${pct}% ${counts}`;
     } else {
-        return `🔴 ${pct}%`;
+        return `🔴 ${pct}% ${counts}`;
     }
 }
 

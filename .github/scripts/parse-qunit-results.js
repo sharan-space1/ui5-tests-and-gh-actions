@@ -202,7 +202,7 @@ function generateMarkdownTable(projectModules, allTestResults) {
         
         testsToShow.forEach(test => {
             const statusIcon = test.status === 'passed' ? '✅' : '❌';
-            const type = test.changed ? '🔄 Changed' : '⚠️ Regression';
+            const type = test.changed ? 'Changed' : 'Regression';
             
             markdown += `| ${test.project} | ${test.module} | ${test.name} | ${statusIcon} | ${type} |\n`;
         });
