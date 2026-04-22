@@ -182,5 +182,6 @@ sap.ui.define([
 		assert.strictEqual(oController.something1("Foo", "Bar"), "FooBar", "Concatenates without space");
 		assert.strictEqual(oController.something1("", "Test"), "Test", "Empty first string");
 		assert.strictEqual(oController.something1("Test", ""), "Test", "Empty second string");
+		assert.strictEqual(oController.something1("Test", "Test"), "TestTest", "Concatenates two identical strings");
 	});
 });
