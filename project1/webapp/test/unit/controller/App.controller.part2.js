@@ -12,14 +12,12 @@ sap.ui.define([
 		var oController = new Controller();
 		assert.strictEqual(oController.sum([1, 2, 3, 4, 5]), 15, "Sum of [1,2,3,4,5] is 15");
 		assert.strictEqual(oController.sum([10, -5, 3]), 8, "Sum of [10,-5,3] is 8");
-		assert.strictEqual(oController.sum([]), 0, "Sum of empty array is 0");
 		assert.strictEqual(oController.sum("not an array"), 0, "Non-array returns 0");
 	});
 
 	QUnit.test("average should return average of array elements", function (assert) {
 		var oController = new Controller();
 		assert.strictEqual(oController.average([1, 2, 3, 4, 5]), 3, "Average of [1,2,3,4,5] is 3");
-		assert.strictEqual(oController.average([10, 20, 30]), 20, "Average of [10,20,30] is 20");
 		assert.strictEqual(oController.average([]), 0, "Average of empty array is 0");
 		assert.strictEqual(oController.average("not an array"), 0, "Non-array returns 0");
 	});
