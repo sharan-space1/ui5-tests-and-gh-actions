@@ -176,4 +176,11 @@ sap.ui.define([
 		assert.strictEqual(oController.countWords("   "), 0, "Whitespace only has 0 words");
 	});
 
+	QUnit.test("something1 should concatenate two strings", function (assert) {
+		var oController = new Controller();
+		assert.strictEqual(oController.something1("Hello, ", "world!"), "Hello, world!", "Concatenates two strings");
+		assert.strictEqual(oController.something1("Foo", "Bar"), "FooBar", "Concatenates without space");
+		assert.strictEqual(oController.something1("", "Test"), "Test", "Empty first string");
+		assert.strictEqual(oController.something1("Test", ""), "Test", "Empty second string");
+	});
 });

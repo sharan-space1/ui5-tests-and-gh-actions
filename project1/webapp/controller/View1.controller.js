@@ -135,6 +135,10 @@ sap.ui.define([
             return 0;
           }
           return str.trim().split(/\s+/).length;
+        },
+
+        something1(str1, str2) {
+          return str1 + str2;
         }
     });
 });
