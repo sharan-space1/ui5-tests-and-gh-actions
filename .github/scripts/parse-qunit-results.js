@@ -134,8 +134,9 @@ function generateMarkdownTable(projectModules, allTestResults) {
     let markdown = '# 🧪 Unit Test Report\n\n';
     
     // Calculate summary statistics
-    const totalChanged = Object.values(projectModules)
-        .flatMap(modules => modules.flatMap(m => m.changedTests)).length;
+    const totalChanged = Object.entries(projectModules)
+        .filter(([key]) => key !== 'changedSourceFiles')
+        .flatMap(([, modules]) => modules.flatMap(m => m.changedTests)).length;
     
     const changedTests = allTestResults.filter(t => t.changed);
     const changedPassed = changedTests.filter(t => t.status === 'passed').length;
@@ -180,6 +181,7 @@ function generateMarkdownTable(projectModules, allTestResults) {
     
     // Modules tested - bulleted list
     const modulesList = Object.entries(projectModules)
+        .filter(([key]) => key !== 'changedSourceFiles')
         .flatMap(([project, modules]) => 
             modules.map(m => `- ${project}/${m.module} (${m.allTests.length} tests, ${m.changedTests.length} changed)`)
         )
@@ -211,7 +213,8 @@ function main() {
     const projectModules = JSON.parse(fs.readFileSync('modules-to-test.json', 'utf8'));
     console.log('[parse-qunit-results] Project modules:', JSON.stringify(projectModules, null, 2));
     
-    if (Object.keys(projectModules).length === 0) {
+    const projectKeys = Object.keys(projectModules).filter(k => k !== 'changedSourceFiles');
+    if (projectKeys.length === 0) {
         console.log('[parse-qunit-results] No modules to test');
         process.exit(0);
     }
@@ -222,7 +225,9 @@ function main() {
     console.log('[parse-qunit-results] ========================================');
     console.log('[parse-qunit-results] Processing test results...\n');
     
-    Object.entries(projectModules).forEach(([project, modules]) => {
+    Object.entries(projectModules)
+        .filter(([key]) => key !== 'changedSourceFiles') // Skip non-project keys
+        .forEach(([project, modules]) => {
         const logFile = `${project}-test-output.log`;
         
         console.log(`[parse-qunit-results] Project: ${project}`);
