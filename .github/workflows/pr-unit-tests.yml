@@ -1,0 +1,156 @@
+name: PR Unit Tests - Changed Tests Only
+
+on:
+  pull_request:
+    branches:
+      - dev
+
+jobs:
+  run-changed-unit-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            */package-lock.json
+      
+      - name: Detect changed test files
+        id: changed-tests
+        run: |
+          echo "Detecting changed test files..."
+          
+          # Get the list of changed files between base and head
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
+          
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          
+          # Filter for unit test files in any folder with /webapp/test/unit/ structure
+          TEST_FILES=$(echo "$CHANGED_FILES" | grep -E '/webapp/test/unit/.*\.js$' || true)
+          
+          if [ -z "$TEST_FILES" ]; then
+            echo "No unit test files changed. Skipping test execution."
+            echo "has_test_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Changed test files:"
+            echo "$TEST_FILES"
+            echo "has_test_changes=true" >> $GITHUB_OUTPUT
+            
+            # Save changed test files as JSON array for the parser script
+            echo "$TEST_FILES" | jq -R -s -c 'split("\n") | map(select(length > 0))' > changed-test-files.json
+          fi
+      
+      - name: Parse changed tests
+        if: steps.changed-tests.outputs.has_test_changes == 'true'
+        env:
+          GIT_BASE_REF: ${{ github.event.pull_request.base.sha }}
+          GIT_HEAD_REF: ${{ github.event.pull_request.head.sha }}
+        run: |
+          node .github/scripts/parse-changed-tests.js
+      
+      - name: Run unit tests for all projects with changes
+        if: steps.changed-tests.outputs.has_test_changes == 'true'
+        env:
+          CI: true
+          GITHUB_ACTIONS: true
+        run: |
+          # Check if any projects have test changes
+          if [ ! -f "projects-with-changes.txt" ]; then
+            echo "No projects with test changes found"
+            exit 0
+          fi
+          
+          # Read projects with changes
+          PROJECTS=$(cat projects-with-changes.txt)
+          
+          if [ -z "$PROJECTS" ]; then
+            echo "No projects with test changes"
+            exit 0
+          fi
+          
+          echo "Projects with test changes:"
+          echo "$PROJECTS"
+          echo ""
+          
+          # Loop through each project and run tests
+          while IFS= read -r project; do
+            if [ -z "$project" ]; then
+              continue
+            fi
+            
+            echo "========================================"
+            echo "Processing: $project"
+            echo "========================================"
+            
+            # Check if project directory exists
+            if [ ! -d "$project" ]; then
+              echo "⚠ Warning: Project directory $project not found, skipping..."
+              continue
+            fi
+            
+            # Check if tests JSON file exists
+            TEST_FILE="${project}-tests.json"
+            if [ ! -f "$TEST_FILE" ]; then
+              echo "⚠ Warning: Test file $TEST_FILE not found, skipping..."
+              continue
+            fi
+            
+            # Check if package.json exists
+            if [ ! -f "$project/package.json" ]; then
+              echo "⚠ Warning: $project/package.json not found, skipping..."
+              continue
+            fi
+            
+            echo "Installing dependencies for $project..."
+            cd "$project"
+            npm ci
+            
+            echo ""
+            echo "Running unit tests for $project..."
+            export PROJECT_CHANGED_TESTS=$(cat "../$TEST_FILE")
+            echo "CHANGED_TESTS:"
+            echo "$PROJECT_CHANGED_TESTS"
+            echo ""
+            
+            # Run the tests
+            npm run unit-test-headless
+            TEST_EXIT_CODE=$?
+            
+            cd ..
+            
+            if [ $TEST_EXIT_CODE -ne 0 ]; then
+              echo "❌ Tests failed for $project"
+              exit $TEST_EXIT_CODE
+            fi
+            
+            echo "✓ Tests passed for $project"
+            echo ""
+            
+          done < projects-with-changes.txt
+          
+          echo "========================================"
+          echo "✓ All project tests completed successfully"
+          echo "========================================"
+      
+      - name: Summary
+        if: always()
+        run: |
+          if [ "${{ steps.changed-tests.outputs.has_test_changes }}" == "false" ]; then
+            echo "✓ No unit test files were modified in this PR"
+          else
+            if [ -f "projects-with-changes.txt" ]; then
+              PROJECT_COUNT=$(cat projects-with-changes.txt | grep -v '^$' | wc -l)
+              echo "✓ Unit tests completed for $PROJECT_COUNT project(s) with modified test files"
+            else
+              echo "✓ Unit tests workflow completed"
+            fi
+          fi
