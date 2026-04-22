@@ -49,7 +49,7 @@ const changeLogs = window.CHANGED_TESTS || [
 
 changeLogs.forEach(test => {
     const testId = generateHash(test.module, test.test);
-    internalTestIds.push(testId);
+    // internalTestIds.push(testId);
 });
 
 if (internalTestIds && internalTestIds.length > 0) {

@@ -81,6 +81,17 @@ jobs:
           echo "$PROJECTS"
           echo ""
           
+          # Initialize summary file
+          echo "# Test Execution Summary" > test-summary.md
+          echo "" >> test-summary.md
+          echo "## 📋 Projects Tested" >> test-summary.md
+          echo "" >> test-summary.md
+          echo "| Project | Tests | Status | Details |" >> test-summary.md
+          echo "|---------|-------|--------|---------|" >> test-summary.md
+          
+          # Track overall status
+          ALL_PASSED=true
+          
           # Loop through each project and run tests
           while IFS= read -r project; do
             if [ -z "$project" ]; then
@@ -94,6 +105,7 @@ jobs:
             # Check if project directory exists
             if [ ! -d "$project" ]; then
               echo "⚠ Warning: Project directory $project not found, skipping..."
+              echo "| $project | N/A | ⚠️ Skipped | Directory not found |" >> test-summary.md
               continue
             fi
             
@@ -101,56 +113,178 @@ jobs:
             TEST_FILE="${project}-tests.json"
             if [ ! -f "$TEST_FILE" ]; then
               echo "⚠ Warning: Test file $TEST_FILE not found, skipping..."
+              echo "| $project | N/A | ⚠️ Skipped | Test file not found |" >> test-summary.md
               continue
             fi
             
             # Check if package.json exists
             if [ ! -f "$project/package.json" ]; then
               echo "⚠ Warning: $project/package.json not found, skipping..."
+              echo "| $project | N/A | ⚠️ Skipped | package.json not found |" >> test-summary.md
               continue
             fi
+            
+            # Count tests
+            TEST_COUNT=$(cat "$TEST_FILE" | jq 'length')
             
             echo "Installing dependencies for $project..."
             cd "$project"
             npm ci
             
             echo ""
-            echo "Running unit tests for $project..."
+            echo "========================================"
+            echo "Tests to execute for $project:"
+            echo "========================================"
+            cat "../$TEST_FILE" | jq -r '.[] | "  • \(.module): \(.test)"'
+            echo "Total: $TEST_COUNT test(s)"
+            echo ""
+            echo "Running $TEST_COUNT unit test(s) for $project..."
             export PROJECT_CHANGED_TESTS=$(cat "../$TEST_FILE")
             echo "CHANGED_TESTS:"
             echo "$PROJECT_CHANGED_TESTS"
             echo ""
             
-            # Run the tests
-            npm run unit-test-headless
-            TEST_EXIT_CODE=$?
+            # Run the tests and capture output (tee to show and save)
+            echo "========================================"
+            echo "Test Output:"
+            echo "========================================"
+            
+            if npm run unit-test-headless 2>&1 | tee "../${project}-test-output.log"; then
+              TEST_EXIT_CODE=0
+              echo ""
+              echo "✓ Tests passed for $project"
+              echo "| $project | $TEST_COUNT | ✅ Passed | All tests passed |" >> ../test-summary.md
+            else
+              TEST_EXIT_CODE=${PIPESTATUS[0]}
+              echo ""
+              echo "❌ Tests failed for $project (Exit code: $TEST_EXIT_CODE)"
+              echo "| $project | $TEST_COUNT | ❌ Failed | Exit code: $TEST_EXIT_CODE |" >> ../test-summary.md
+              ALL_PASSED=false
+            fi
             
             cd ..
             
-            if [ $TEST_EXIT_CODE -ne 0 ]; then
-              echo "❌ Tests failed for $project"
-              exit $TEST_EXIT_CODE
+            # Add test list to summary
+            echo "" >> test-summary.md
+            echo "### Tests executed in $project:" >> test-summary.md
+            echo "" >> test-summary.md
+            cat "$TEST_FILE" | jq -r '.[] | "- **\(.module)**: \(.test)"' >> test-summary.md
+            echo "" >> test-summary.md
+            
+            # Store detailed output with better formatting
+            echo "" >> test-summary.md
+            echo "<details>" >> test-summary.md
+            echo "<summary>📋 View full test output for $project (${TEST_COUNT} test(s))</summary>" >> test-summary.md
+            echo "" >> test-summary.md
+            echo "\`\`\`" >> test-summary.md
+            cat "${project}-test-output.log" >> test-summary.md
+            echo "\`\`\`" >> test-summary.md
+            echo "</details>" >> test-summary.md
+            echo "" >> test-summary.md
+            
+            # Extract test results summary if available (QUnit output)
+            if grep -q "passed\|failed" "${project}-test-output.log" 2>/dev/null; then
+              echo "<details>" >> test-summary.md
+              echo "<summary>📊 Test Results Summary</summary>" >> test-summary.md
+              echo "" >> test-summary.md
+              echo "\`\`\`" >> test-summary.md
+              grep -E "(passed|failed|total|✓|✗|×)" "${project}-test-output.log" | tail -20 >> test-summary.md
+              echo "\`\`\`" >> test-summary.md
+              echo "</details>" >> test-summary.md
+              echo "" >> test-summary.md
             fi
             
-            echo "✓ Tests passed for $project"
-            echo ""
+            if [ $TEST_EXIT_CODE -ne 0 ]; then
+              echo ""
+              echo "Failed tests in $project, continuing with remaining projects..."
+              echo ""
+            else
+              echo ""
+            fi
             
           done < projects-with-changes.txt
           
-          echo "========================================"
-          echo "✓ All project tests completed successfully"
-          echo "========================================"
+          # Final summary
+          echo "" >> test-summary.md
+          echo "---" >> test-summary.md
+          
+          if [ "$ALL_PASSED" = true ]; then
+            echo "## ✅ Result: All Tests Passed" >> test-summary.md
+            echo "========================================"
+            echo "✓ All project tests completed successfully"
+            echo "========================================"
+            exit 0
+          else
+            echo "## ❌ Result: Some Tests Failed" >> test-summary.md
+            echo "========================================"
+            echo "❌ Some project tests failed"
+            echo "========================================"
+            exit 1
+          fi
       
       - name: Summary
         if: always()
         run: |
+          echo "========================================"
+          echo "Test Execution Summary"
+          echo "========================================"
+          echo ""
+          
           if [ "${{ steps.changed-tests.outputs.has_test_changes }}" == "false" ]; then
             echo "✓ No unit test files were modified in this PR"
+            echo ""
+            echo "## ✅ No Test Changes" >> $GITHUB_STEP_SUMMARY
+            echo "No unit test files were modified in this PR." >> $GITHUB_STEP_SUMMARY
           else
-            if [ -f "projects-with-changes.txt" ]; then
-              PROJECT_COUNT=$(cat projects-with-changes.txt | grep -v '^$' | wc -l)
-              echo "✓ Unit tests completed for $PROJECT_COUNT project(s) with modified test files"
+            if [ -f "test-summary.md" ]; then
+              # Display summary in console
+              cat test-summary.md
+              echo ""
+              
+              # Add to GitHub Actions summary
+              cat test-summary.md >> $GITHUB_STEP_SUMMARY
+              
+              # Show test details
+              if [ -f "projects-with-changes.txt" ]; then
+                echo "---"
+                echo ""
+                echo "### Tests Executed:" >> $GITHUB_STEP_SUMMARY
+                echo "" >> $GITHUB_STEP_SUMMARY
+                
+                while IFS= read -r project; do
+                  if [ -z "$project" ]; then
+                    continue
+                  fi
+                  
+                  TEST_FILE="${project}-tests.json"
+                  if [ -f "$TEST_FILE" ]; then
+                    echo "**$project:**" >> $GITHUB_STEP_SUMMARY
+                    echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+                    cat "$TEST_FILE" >> $GITHUB_STEP_SUMMARY
+                    echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+                    echo "" >> $GITHUB_STEP_SUMMARY
+                  fi
+                done < projects-with-changes.txt
+              fi
             else
-              echo "✓ Unit tests workflow completed"
+              PROJECT_COUNT=$(cat projects-with-changes.txt | grep -v '^$' | wc -l 2>/dev/null || echo "0")
+              echo "✓ Unit tests completed for $PROJECT_COUNT project(s)"
+              echo ""
+              echo "## ✅ Tests Completed" >> $GITHUB_STEP_SUMMARY
+              echo "Unit tests completed for $PROJECT_COUNT project(s) with modified test files." >> $GITHUB_STEP_SUMMARY
             fi
           fi
+          
+          echo "========================================"
+      
+      - name: Upload test results
+        if: always() && steps.changed-tests.outputs.has_test_changes == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            *-tests.json
+            *-test-output.log
+            test-summary.md
+            projects-with-changes.txt
+          retention-days: 30
