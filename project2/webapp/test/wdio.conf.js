@@ -44,7 +44,7 @@ exports.config = {
     services: [
         ['qunit', {
             paths: [
-                'test/unit/unitTests.qunit.html'
+                'test/unit/unitTests.qunit.html?coverage'
             ]
         }]
     ],

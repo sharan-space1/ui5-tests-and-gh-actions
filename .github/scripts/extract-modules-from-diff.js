@@ -35,6 +35,50 @@ function getChangedTestFiles(baseRef, headRef) {
 }
 
 /**
+ * Get changed source files from git diff (for coverage filtering)
+ */
+function getChangedSourceFiles(baseRef, headRef) {
+    try {
+        const diff = execSync(
+            `git diff ${baseRef}..${headRef} --name-only`,
+            { encoding: 'utf8' }
+        );
+        
+        const files = diff.split('\n')
+            .filter(f => f.trim().length > 0)
+            .filter(f => f.includes('/webapp/') && f.endsWith('.js'))
+            .filter(f => {
+                // Include controller, model, and Component.js files
+                return f.includes('/controller/') || 
+                       f.includes('/model/') || 
+                       f.endsWith('/Component.js');
+            })
+            .filter(f => {
+                // Exclude test files
+                return !f.includes('/test/');
+            })
+            .map(f => {
+                // Extract project name
+                const projectName = f.split('/')[0];
+                // Get relative path from webapp
+                const webappIndex = f.indexOf('/webapp/');
+                const relativePath = webappIndex >= 0 ? f.substring(webappIndex + 8) : f;
+                
+                return {
+                    project: projectName,
+                    file: relativePath,
+                    fullPath: f
+                };
+            });
+        
+        return files;
+    } catch (error) {
+        console.error('Error getting changed source files:', error.message);
+        return [];
+    }
+}
+
+/**
  * Get changed line ranges from git diff
  */
 function getChangedLineRanges(filePath, baseRef, headRef) {
@@ -145,11 +189,14 @@ function main() {
     console.log('[extract-modules] ========================================\n');
     
     const changedFiles = getChangedTestFiles(baseRef, headRef);
-    console.log(`[extract-modules] Changed files detected: ${changedFiles.length}\n`);
+    const changedSourceFiles = getChangedSourceFiles(baseRef, headRef);
     
-    if (changedFiles.length === 0) {
-        console.log('[extract-modules] No test files changed.');
-        fs.writeFileSync('modules-to-test.json', JSON.stringify({}, null, 2));
+    console.log(`[extract-modules] Changed test files detected: ${changedFiles.length}`);
+    console.log(`[extract-modules] Changed source files detected: ${changedSourceFiles.length}\n`);
+    
+    if (changedFiles.length === 0 && changedSourceFiles.length === 0) {
+        console.log('[extract-modules] No test or source files changed.');
+        fs.writeFileSync('modules-to-test.json', JSON.stringify({ changedSourceFiles: [] }, null, 2));
         console.log('[extract-modules] ✓ Created empty modules-to-test.json');
         process.exit(0);
     }
@@ -190,6 +237,9 @@ function main() {
         console.log('');
     });
     
+    // Add changed source files to output
+    projectModules.changedSourceFiles = changedSourceFiles;
+    
     // Write output
     console.log('[extract-modules] ========================================');
     console.log('[extract-modules] Writing output...');
@@ -199,7 +249,8 @@ function main() {
     fs.writeFileSync('modules-to-test.json', outputJson);
     
     console.log('[extract-modules] ✓ Created modules-to-test.json');
-    console.log(`[extract-modules] ✓ Projects with changes: ${Object.keys(projectModules).join(', ')}`);
+    console.log(`[extract-modules] ✓ Projects with changes: ${Object.keys(projectModules).filter(k => k !== 'changedSourceFiles').join(', ')}`);
+    console.log(`[extract-modules] ✓ Changed source files: ${changedSourceFiles.length}`);
     console.log('[extract-modules] ========================================');
 }
 
