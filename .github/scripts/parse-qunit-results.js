@@ -178,14 +178,14 @@ function generateMarkdownTable(projectModules, allTestResults) {
         markdown += '\n';
     }
     
-    // Modules tested - simple list
+    // Modules tested - bulleted list
     const modulesList = Object.entries(projectModules)
         .flatMap(([project, modules]) => 
-            modules.map(m => `**${project}/${m.module}** (${m.allTests.length} tests, ${m.changedTests.length} changed)`)
+            modules.map(m => `- ${project}/${m.module} (${m.allTests.length} tests, ${m.changedTests.length} changed)`)
         )
-        .join(' • ');
+        .join('\n');
     
-    markdown += `📦 **Modules:** ${modulesList}\n\n`;
+    markdown += `📦 Modules:\n${modulesList}\n\n`;
     
     markdown += '---\n';
     markdown += `<sub>📅 ${new Date().toUTCString()}</sub>\n`;
