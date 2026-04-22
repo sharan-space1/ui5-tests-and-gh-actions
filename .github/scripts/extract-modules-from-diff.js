@@ -97,8 +97,18 @@ function extractModuleAndTests(filePath, baseRef, headRef) {
             const beforeMatch = content.substring(0, testMatch.index);
             const lineNumber = beforeMatch.split('\n').length;
             
+            // Check if this test is affected by changes
+            // Handle both additions (start <= end) and deletions (start > end)
+            // Also check within a 5-line buffer around changes
             const isChanged = changedRanges.length === 0 || 
-                            changedRanges.some(range => lineNumber >= range.start && lineNumber <= range.end);
+                            changedRanges.some(range => {
+                                // For deletions (start > end), check if test is near the deletion point
+                                if (range.start > range.end) {
+                                    return Math.abs(lineNumber - range.start) <= 5;
+                                }
+                                // For additions/modifications, check if line is within or near the range
+                                return (lineNumber >= range.start - 5 && lineNumber <= range.end + 5);
+                            });
             
             console.log(`[extract-modules]   Test: "${testName}" at line ${lineNumber} - ${isChanged ? 'CHANGED' : 'unchanged'}`);
             
