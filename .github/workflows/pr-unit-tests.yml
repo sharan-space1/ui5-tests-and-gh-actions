@@ -98,7 +98,7 @@ jobs:
         run: |
           node .github/scripts/parse-qunit-results.js
       
-      - name: Post or update PR comment
+      - name: Post PR comment
         if: steps.extract.outputs.has_modules == 'true'
         uses: actions/github-script@v7
         with:
@@ -112,37 +112,42 @@ jobs:
             
             const commentBody = fs.readFileSync('pr-comment.md', 'utf8');
             
-            // Find existing comment from this workflow
+            // Find existing comments from this workflow
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.payload.pull_request.number
             });
             
-            const botComment = comments.find(comment => 
+            const botComments = comments.filter(comment => 
               comment.user.login === 'github-actions[bot]' &&
-              comment.body.includes('🧪 Test Results')
+              comment.body.includes('Unit Test Report')
             );
             
-            if (botComment) {
-              // Update existing comment
-              console.log('Updating existing comment...');
+            // Mark old comments as outdated
+            for (const oldComment of botComments) {
+              console.log(`Marking comment ${oldComment.id} as outdated...`);
+              const outdatedBody = '> ⚠️ **This report is outdated.** See the latest report below.\n\n' + 
+                                   '<details>\n<summary>View outdated report</summary>\n\n' +
+                                   oldComment.body +
+                                   '\n</details>';
+              
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: commentBody
-              });
-            } else {
-              // Create new comment
-              console.log('Creating new comment...');
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.payload.pull_request.number,
-                body: commentBody
+                comment_id: oldComment.id,
+                body: outdatedBody
               });
             }
+            
+            // Create new comment
+            console.log('Creating new test report comment...');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: commentBody
+            });
       
       - name: No test changes
         if: steps.extract.outputs.has_modules == 'false'

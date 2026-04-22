@@ -16,24 +16,76 @@ function parseQUnitResults(logContent, moduleName) {
     const lines = logContent.split('\n');
     console.log(`[parseQUnitResults]   Log has ${lines.length} lines`);
     
-    // Look for QUnit test results
-    // Common patterns: "✓ test name" or "✗ test name" or lines with "passed" / "failed"
+    // Find the module section in the log
+    let inModuleSection = false;
+    let moduleFound = false;
     
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         
-        // Pattern 1: Look for test execution results
-        // Example: "    ✓ Test at line 17: "add should return sum of two numbers" (CHANGED)"
-        const changedTestMatch = line.match(/[✓✗×]\s+Test at line \d+:\s+"([^"]+)"\s+\(CHANGED\)/);
-        if (changedTestMatch) {
-            const testName = changedTestMatch[1];
-            const isPassed = line.includes('✓');
+        // Look for test results first (has checkmark)
+        // WDIO format: [chrome 147.0.7727.57 linux #0-0]    ✓ test name
+        // or: [chrome 147.0.7727.57 linux #0-0]    ✖ test name
+        const testMatch = line.match(/\[chrome[^\]]+\]\s+(✓|✖)\s+(.+?)$/);
+        if (testMatch && inModuleSection) {
+            const checkMark = testMatch[1];
+            const testName = testMatch[2].trim();
+            const isPassed = checkMark === '✓';
+            
+            console.log(`[parseQUnitResults]     Found test: "${testName}" - ${isPassed ? 'PASSED' : 'FAILED'}`);
+            
+            // Extract error message if failed
+            let errorMessage = '';
+            if (!isPassed) {
+                // Look back for error details in the WDIO error logs
+                // Error format: [0-0] timestamp ERROR wdio-qunit-service: QUnit Test: ModuleName.testName
+                // Followed by: Expected:, Received:, Message: lines
+                
+                let expectedVal = '';
+                let receivedVal = '';
+                let errorMsg = '';
+                let foundErrorBlock = false;
+                
+                // Search backwards for ERROR wdio-qunit-service messages containing this test
+                for (let j = Math.max(0, i - 25); j < i; j++) {
+                    const errorLine = lines[j];
+                    
+                    // Check if this is an ERROR line mentioning our test
+                    // The test name appears as "ModuleName.testName" in the error
+                    if (errorLine.includes('ERROR wdio-qunit-service') && 
+                        (errorLine.includes(testName) || errorLine.includes(`.${testName}`))) {
+                        foundErrorBlock = true;
+                        
+                        // Now collect Expected/Received/Message from following lines
+                        for (let k = j + 1; k < Math.min(j + 6, lines.length); k++) {
+                            if (lines[k].includes('ERROR wdio-qunit-service: Expected:')) {
+                                expectedVal = lines[k].split('Expected:')[1].trim();
+                            } else if (lines[k].includes('ERROR wdio-qunit-service: Received:')) {
+                                receivedVal = lines[k].split('Received:')[1].trim();
+                            } else if (lines[k].includes('ERROR wdio-qunit-service: Message:')) {
+                                errorMsg = lines[k].split('Message:')[1].trim();
+                            }
+                        }
+                        break;
+                    }
+                }
+                
+                // Build concise error message
+                if (errorMsg) errorMessage += errorMsg + ' | ';
+                if (expectedVal && receivedVal) {
+                    errorMessage += `Expected: ${expectedVal}, Got: ${receivedVal}`;
+                } else if (expectedVal) {
+                    errorMessage += `Expected: ${expectedVal}`;
+                } else if (receivedVal) {
+                    errorMessage += `Got: ${receivedVal}`;
+                }
+            }
             
             results.tests.push({
                 module: moduleName,
                 name: testName,
                 status: isPassed ? 'passed' : 'failed',
-                message: ''
+                message: errorMessage.trim()
             });
             
             if (isPassed) results.passed++;
@@ -41,36 +93,33 @@ function parseQUnitResults(logContent, moduleName) {
             continue;
         }
         
-        // Pattern 2: Standard QUnit output
-        // Look for patterns like "✓ testname" or "× testname"
-        if (line.trim().match(/^[✓✗×]/)) {
-            const testMatch = line.match(/^[\s]*[✓✗×]\s+(.+?)(\s+\(|$)/);
-            if (testMatch) {
-                const testName = testMatch[1].trim();
-                const isPassed = line.includes('✓');
+        // WDIO format module header: [chrome 147.0.7727.57 linux #0-0] Module Name
+        // This line should NOT have ✓ or ✖ in it
+        if (!line.includes('✓') && !line.includes('✖')) {
+            const moduleHeaderMatch = line.match(/\[chrome[^\]]+\]\s+(.+?)$/);
+            if (moduleHeaderMatch) {
+                const lineModuleName = moduleHeaderMatch[1].trim();
                 
-                // Extract error message if failed
-                let errorMessage = '';
-                if (!isPassed) {
-                    // Look ahead for error details
-                    for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
-                        if (lines[j].includes('Expected') || lines[j].includes('Actual') || lines[j].includes('Error:')) {
-                            errorMessage += lines[j].trim() + ' ';
-                        }
+                // Check if this is our target module
+                if (lineModuleName === moduleName) {
+                    console.log(`[parseQUnitResults]   ✓ Found module header at line ${i + 1}: "${lineModuleName}"`);
+                    inModuleSection = true;
+                    moduleFound = true;
+                    continue;
+                } else if (inModuleSection && lineModuleName && lineModuleName.length > 0) {
+                    // We've moved to a different module section, stop parsing
+                    // Check if this looks like a module name (not too long, capitalized, etc.)
+                    if (lineModuleName.length < 100 && /^[A-Z]/.test(lineModuleName)) {
+                        console.log(`[parseQUnitResults]   End of module section at line ${i + 1} (found: "${lineModuleName}")`);
+                        break;
                     }
                 }
-                
-                results.tests.push({
-                    module: moduleName,
-                    name: testName,
-                    status: isPassed ? 'passed' : 'failed',
-                    message: errorMessage.trim()
-                });
-                
-                if (isPassed) results.passed++;
-                else results.failed++;
             }
         }
+    }
+    
+    if (!moduleFound) {
+        console.log(`[parseQUnitResults]   ⚠ Warning: Module "${moduleName}" not found in log`);
     }
     
     results.total = results.passed + results.failed;
@@ -82,7 +131,7 @@ function parseQUnitResults(logContent, moduleName) {
  * Generate markdown table for PR comment
  */
 function generateMarkdownTable(projectModules, allTestResults) {
-    let markdown = '## 🧪 Test Results\n\n';
+    let markdown = '# 🧪 Unit Test Report\n\n';
     
     // Calculate summary statistics
     const totalChanged = Object.values(projectModules)
@@ -94,54 +143,52 @@ function generateMarkdownTable(projectModules, allTestResults) {
     
     const regressions = allTestResults.filter(t => !t.changed && t.status === 'failed');
     
-    markdown += '### Summary\n\n';
-    markdown += `- **Changed tests**: ${totalChanged} (✅ ${changedPassed} passed, ❌ ${changedFailed} failed)\n`;
-    if (regressions.length > 0) {
-        markdown += `- **Regressions**: ${regressions.length} test(s) failed that weren't changed\n`;
-    }
-    markdown += '\n';
+    const totalTests = allTestResults.length;
+    const totalPassed = allTestResults.filter(t => t.status === 'passed').length;
+    const totalFailed = allTestResults.filter(t => t.status === 'failed').length;
     
+    // Summary
     if (changedFailed === 0 && regressions.length === 0) {
-        markdown += '✅ **All tests passed!**\n\n';
+        markdown += '## ✅ All Tests Passed\n\n';
     } else {
-        markdown += '❌ **Some tests failed**\n\n';
+        markdown += '## ❌ Tests Failed\n\n';
     }
     
-    // Show only changed tests + failed tests
+    markdown += `📊 **Total:** ${totalPassed}/${totalTests} passed`;
+    if (regressions.length > 0) {
+        markdown += ` • ⚠️ ${regressions.length} regression(s)`;
+    }
+    markdown += `\n🔄 **Changed:** ${changedPassed}/${totalChanged} passed\n\n`;
+    
+    // Show only changed tests + failed tests in table
     const testsToShow = allTestResults.filter(t => t.changed || t.status === 'failed');
     
     if (testsToShow.length > 0) {
-        markdown += '### Detailed Results\n\n';
-        markdown += '| Project | Module | Test | Status | Type | Details |\n';
-        markdown += '|---------|--------|------|--------|------|---------||\n';
+        markdown += '### Test Results\n\n';
+        markdown += '| Project | Module | Test | Status | Type |\n';
+        markdown += '|---------|--------|------|:------:|------|\n';
         
         testsToShow.forEach(test => {
             const statusIcon = test.status === 'passed' ? '✅' : '❌';
             const type = test.changed ? '🔄 Changed' : '⚠️ Regression';
-            const details = test.message ? test.message.substring(0, 100) : '';
             
-            markdown += `| ${test.project} | ${test.module} | ${test.name} | ${statusIcon} | ${type} | ${details} |\n`;
+            markdown += `| ${test.project} | ${test.module} | ${test.name} | ${statusIcon} | ${type} |\n`;
         });
         
         markdown += '\n';
     }
     
-    // Add collapsible section for modules tested
-    markdown += '<details>\n';
-    markdown += '<summary>📋 Modules Tested</summary>\n\n';
+    // Modules tested - simple list
+    const modulesList = Object.entries(projectModules)
+        .flatMap(([project, modules]) => 
+            modules.map(m => `**${project}/${m.module}** (${m.allTests.length} tests, ${m.changedTests.length} changed)`)
+        )
+        .join(' • ');
     
-    Object.entries(projectModules).forEach(([project, modules]) => {
-        markdown += `**${project}:**\n`;
-        modules.forEach(m => {
-            markdown += `- ${m.module} (${m.allTests.length} tests total, ${m.changedTests.length} changed)\n`;
-        });
-        markdown += '\n';
-    });
-    
-    markdown += '</details>\n\n';
+    markdown += `📦 **Modules:** ${modulesList}\n\n`;
     
     markdown += '---\n';
-    markdown += `*Updated: ${new Date().toUTCString()}*\n`;
+    markdown += `<sub>📅 ${new Date().toUTCString()}</sub>\n`;
     
     return markdown;
 }
