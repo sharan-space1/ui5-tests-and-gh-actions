@@ -23,37 +23,42 @@ function generateHash(module, testName) {
     return hex.slice(-8);
 }
 
-const internalTestIds = [];
+const internalModuleIds = [];
 
-// Read from window.CHANGED_TESTS (injected by CI) or use local defaults
-// In CI: window.CHANGED_TESTS will be set by build pipeline
-// Locally: falls back to hardcoded changeLogs for development
-const changeLogs = window.CHANGED_TESTS || [
-    {
-        "module": "App Controller",
-        "test": "add should return sum of two numbers"
-    },
-    {
-        "module": "App Controller",
-        "test": "divide should return quotient of two numbers"
-    },
-    {
-        "module": "View1 Controller",
-        "test": "capitalize should capitalize first letter"
-    },
-    {
-        "module": "App Controller - Part 2 (Array & Date Operations)",
-        "test": "sum should return sum of array elements"
-    }
-];
+// Function to get URL parameter
+function getUrlParameter(name) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(name);
+}
 
-changeLogs.forEach(test => {
-    const testId = generateHash(test.module, test.test);
-    // internalTestIds.push(testId);
+// Read module names from:
+// 1. URL parameter (?modules=App Controller,View1 Controller)
+// 2. window.TEST_MODULES (injected by CI)
+// 3. Fallback to hardcoded defaults for local development
+const modulesParam = getUrlParameter('modules');
+let moduleNames;
+
+if (modulesParam) {
+    // From URL parameter (comma-separated)
+    moduleNames = modulesParam.split(',').map(m => m.trim());
+} else if (window.TEST_MODULES) {
+    // From window variable (injected by CI)
+    moduleNames = window.TEST_MODULES;
+} else {
+    // Fallback for local development
+    moduleNames = ["App Controller", "View1 Controller"];
+}
+
+// Convert module names to internal IDs using hash function
+moduleNames.forEach(module => {
+    const moduleId = generateHash(module, "");
+    internalModuleIds.push(moduleId);
 });
 
-if (internalTestIds && internalTestIds.length > 0) {
-    QUnit.config.testId = internalTestIds;
+if (internalModuleIds && internalModuleIds.length > 0) {
+    QUnit.config.moduleId = internalModuleIds;
+    console.log("Running tests for modules:", moduleNames);
+    console.log("Module IDs:", internalModuleIds);
 }
 
 sap.ui.require([
