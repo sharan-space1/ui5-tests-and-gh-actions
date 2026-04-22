@@ -36,15 +36,17 @@ function getChangedTestFiles(baseRef, headRef) {
 
 /**
  * Get changed source files from git diff (for coverage filtering)
+ * Includes both directly modified source files AND source files tested by changed test files
  */
-function getChangedSourceFiles(baseRef, headRef) {
+function getChangedSourceFiles(baseRef, headRef, changedTestFiles) {
     try {
         const diff = execSync(
             `git diff ${baseRef}..${headRef} --name-only`,
             { encoding: 'utf8' }
         );
         
-        const files = diff.split('\n')
+        // Get directly modified source files
+        const modifiedSourceFiles = diff.split('\n')
             .filter(f => f.trim().length > 0)
             .filter(f => f.includes('/webapp/') && f.endsWith('.js'))
             .filter(f => {
@@ -56,6 +58,34 @@ function getChangedSourceFiles(baseRef, headRef) {
             .filter(f => {
                 // Exclude test files
                 return !f.includes('/test/');
+            });
+        
+        // Map changed test files to their corresponding source files
+        const inferredSourceFiles = changedTestFiles.map(testFile => {
+            // Convert test path to source path
+            // e.g., project1/webapp/test/unit/controller/App.controller.js
+            //    -> project1/webapp/controller/App.controller.js
+            if (testFile.includes('/test/unit/controller/')) {
+                return testFile.replace('/test/unit/controller/', '/controller/');
+            } else if (testFile.includes('/test/unit/model/')) {
+                return testFile.replace('/test/unit/model/', '/model/');
+            } else if (testFile.includes('/test/unit/') && testFile.endsWith('Component.js')) {
+                return testFile.replace('/test/unit/', '/');
+            }
+            return null;
+        }).filter(f => f !== null);
+        
+        // Combine and deduplicate
+        const allSourceFiles = [...new Set([...modifiedSourceFiles, ...inferredSourceFiles])];
+        
+        // Verify files exist and format output
+        const result = allSourceFiles
+            .filter(f => {
+                try {
+                    return fs.existsSync(f);
+                } catch (e) {
+                    return false;
+                }
             })
             .map(f => {
                 // Extract project name
@@ -71,7 +101,7 @@ function getChangedSourceFiles(baseRef, headRef) {
                 };
             });
         
-        return files;
+        return result;
     } catch (error) {
         console.error('Error getting changed source files:', error.message);
         return [];
@@ -189,10 +219,10 @@ function main() {
     console.log('[extract-modules] ========================================\n');
     
     const changedFiles = getChangedTestFiles(baseRef, headRef);
-    const changedSourceFiles = getChangedSourceFiles(baseRef, headRef);
+    const changedSourceFiles = getChangedSourceFiles(baseRef, headRef, changedFiles);
     
     console.log(`[extract-modules] Changed test files detected: ${changedFiles.length}`);
-    console.log(`[extract-modules] Changed source files detected: ${changedSourceFiles.length}\n`);
+    console.log(`[extract-modules] Changed/inferred source files detected: ${changedSourceFiles.length}\n`);
     
     if (changedFiles.length === 0 && changedSourceFiles.length === 0) {
         console.log('[extract-modules] No test or source files changed.');

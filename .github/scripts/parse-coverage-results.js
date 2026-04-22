@@ -9,19 +9,8 @@ function parseCoverageResults() {
     console.log('[parse-coverage] Starting coverage result parsing...');
     console.log('[parse-coverage] ========================================\n');
 
-    // Read modules-to-test.json to get changed source files
-    if (!fs.existsSync('modules-to-test.json')) {
-        console.log('[parse-coverage] ⚠ No modules-to-test.json found');
-        return null;
-    }
-
     const modulesData = JSON.parse(fs.readFileSync('modules-to-test.json', 'utf8'));
     const changedSourceFiles = modulesData.changedSourceFiles || [];
-
-    if (changedSourceFiles.length === 0) {
-        console.log('[parse-coverage] ⚠ No changed source files to filter coverage');
-        return null;
-    }
 
     console.log(`[parse-coverage] Changed source files: ${changedSourceFiles.length}`);
     changedSourceFiles.forEach(f => {
@@ -42,7 +31,7 @@ function parseCoverageResults() {
 
     // Process each project
     Object.keys(filesByProject).forEach(project => {
-        const coverageFile = path.join(project, 'tmp', 'coverage-reports', 'coverage-final.json');
+        const coverageFile = path.join(project, 'tmp', 'coverage-reports', 'json', 'coverage-final.json');
         
         console.log(`[parse-coverage] Processing ${project}...`);
         console.log(`[parse-coverage] Looking for: ${coverageFile}`);
@@ -176,10 +165,27 @@ function formatBadge(pct) {
  * Main function
  */
 function main() {
+    // Check if modules-to-test.json exists
+    if (!fs.existsSync('modules-to-test.json')) {
+        console.log('[parse-coverage] No modules-to-test.json found - skipping coverage report');
+        addSkipMessage('No test changes detected');
+        return;
+    }
+
+    const modulesData = JSON.parse(fs.readFileSync('modules-to-test.json', 'utf8'));
+    const changedSourceFiles = modulesData.changedSourceFiles || [];
+
+    if (changedSourceFiles.length === 0) {
+        console.log('[parse-coverage] No changed source files - skipping coverage report');
+        addSkipMessage('No source files changed (only test files modified)');
+        return;
+    }
+
     const coverageResults = parseCoverageResults();
 
     if (!coverageResults || coverageResults.length === 0) {
         console.log('[parse-coverage] No coverage results to report');
+        addSkipMessage('Coverage data not available');
         return;
     }
 
@@ -205,6 +211,28 @@ function main() {
     console.log('[parse-coverage] ========================================');
     console.log('[parse-coverage] ✓ Coverage report added to pr-comment.md');
     console.log('[parse-coverage] ========================================');
+}
+
+/**
+ * Add skip message to pr-comment.md
+ */
+function addSkipMessage(reason) {
+    const skipMessage = [
+        '## 📊 Code Coverage Report',
+        '',
+        `_Coverage report skipped: ${reason}_`,
+        ''
+    ].join('\n');
+
+    let existingComment = '';
+    if (fs.existsSync('pr-comment.md')) {
+        existingComment = fs.readFileSync('pr-comment.md', 'utf8');
+    }
+
+    const updatedComment = existingComment + '\n\n' + skipMessage;
+    fs.writeFileSync('pr-comment.md', updatedComment);
+
+    console.log('[parse-coverage] ✓ Skip message added to pr-comment.md');
 }
 
 main();
