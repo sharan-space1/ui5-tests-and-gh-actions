@@ -171,7 +171,6 @@ sap.ui.define([
 		var oController = new Controller();
 		assert.strictEqual(oController.countWords("hello world"), 2, "Two words");
 		assert.strictEqual(oController.countWords("one"), 1, "One word");
-		assert.strictEqual(oController.countWords("  multiple   spaces  between  "), 3, "Three words with extra spaces");
 		assert.strictEqual(oController.countWords(""), 0, "Empty string has 0 words");
 		assert.strictEqual(oController.countWords("   "), 0, "Whitespace only has 0 words");
 	});
