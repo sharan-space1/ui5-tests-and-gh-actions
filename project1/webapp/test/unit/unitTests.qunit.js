@@ -42,7 +42,7 @@ console.log("[unitTests.qunit.js] window.TEST_MODULES:", window.TEST_MODULES);
 const modulesParam = getUrlParameter('modules');
 console.log("[unitTests.qunit.js] URL modules parameter:", modulesParam);
 
-let moduleNames;
+let moduleNames = [];
 
 if (modulesParam) {
     // From URL parameter (comma-separated)
