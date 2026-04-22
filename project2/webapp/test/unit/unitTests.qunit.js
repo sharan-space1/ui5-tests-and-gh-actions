@@ -4,7 +4,7 @@ QUnit.config.autostart = false;
 // Took from Qunit 2.3.2
 // Based on Java's String.hashCode, a simple but not rigorously collision resistant hashing function
 function generateHash(module, testName) {
-    var str = testName !== undefined ? module + "\x1C" + testName : module;
+    var str = module + "\x1C" + testName;
     var hash = 0;
 
     for (var i = 0; i < str.length; i++) {
@@ -51,12 +51,7 @@ if (modulesParam) {
     // From window variable (injected by CI)
     moduleNames = window.TEST_MODULES;
     console.log("[unitTests.qunit.js] Using window.TEST_MODULES:", moduleNames);
-} else {
-    // Fallback for local development
-    moduleNames = ["App Controller", "View1 Controller"];
-    console.log("[unitTests.qunit.js] Using fallback modules:", moduleNames);
 }
-
 // Convert module names to internal IDs using hash function
 console.log("[unitTests.qunit.js] Converting module names to hash IDs...");
 moduleNames.forEach(module => {
