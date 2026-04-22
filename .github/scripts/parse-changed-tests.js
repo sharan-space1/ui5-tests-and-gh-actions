@@ -13,10 +13,20 @@ function getChangedLineRanges(filePath, baseRef, headRef) {
     try {
         // Get unified diff with line numbers
         // -U0 shows only changed lines (no context)
-        const diff = execSync(
-            `git diff ${baseRef}..${headRef} --unified=0 -- "${filePath}"`,
-            { encoding: 'utf8' }
-        );
+        let diff;
+        
+        // For local testing: if comparing HEAD to working directory
+        if (headRef === 'WORKING_DIR') {
+            diff = execSync(
+                `git diff ${baseRef} -- "${filePath}"`,
+                { encoding: 'utf8' }
+            );
+        } else {
+            diff = execSync(
+                `git diff ${baseRef}..${headRef} --unified=0 -- "${filePath}"`,
+                { encoding: 'utf8' }
+            );
+        }
         
         const ranges = [];
         const lines = diff.split('\n');
@@ -154,10 +164,15 @@ function main() {
     const changedFilesPath = 'changed-test-files.json';
     
     // Get git refs from environment variables (set by workflow)
+    // For local testing: set GIT_HEAD_REF=WORKING_DIR to compare against unstaged changes
     const baseRef = process.env.GIT_BASE_REF || 'HEAD~1';
     const headRef = process.env.GIT_HEAD_REF || 'HEAD';
     
-    console.log(`Comparing ${baseRef}..${headRef}\n`);
+    if (headRef === 'WORKING_DIR') {
+        console.log(`Comparing ${baseRef} vs working directory changes\n`);
+    } else {
+        console.log(`Comparing ${baseRef}..${headRef}\n`);
+    }
     
     if (!fs.existsSync(changedFilesPath)) {
         console.log('No changed test files found.');
