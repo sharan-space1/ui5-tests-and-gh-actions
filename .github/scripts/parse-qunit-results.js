@@ -148,24 +148,55 @@ function generateMarkdownTable(projectModules, allTestResults) {
     const totalPassed = allTestResults.filter(t => t.status === 'passed').length;
     const totalFailed = allTestResults.filter(t => t.status === 'failed').length;
     
-    // Summary
+    // Summary status
     if (changedFailed === 0 && regressions.length === 0) {
         markdown += '## ✅ All Tests Passed\n\n';
     } else {
         markdown += '## ❌ Tests Failed\n\n';
     }
     
-    markdown += `📊 **Total:** ${totalPassed}/${totalTests} passed`;
+    // Total changed summary
+    markdown += `### 📊 Summary\n\n`;
+    markdown += `- **Total Tests:** ${totalPassed}/${totalTests} passed`;
     if (regressions.length > 0) {
         markdown += ` • ⚠️ ${regressions.length} regression(s)`;
     }
-    markdown += `\n🔄 **Changed:** ${changedPassed}/${totalChanged} passed\n\n`;
+    markdown += `\n- **Changed Tests:** ${changedPassed}/${totalChanged} passed\n\n`;
     
-    // Show only changed tests + failed tests in table
+    // Collapsible: Changed Files
+    const changedSourceFiles = projectModules.changedSourceFiles || [];
+    if (changedSourceFiles.length > 0) {
+        markdown += '<details>\n';
+        markdown += '<summary>📁 Changed Files (' + changedSourceFiles.length + ')</summary>\n\n';
+        changedSourceFiles.forEach(file => {
+            markdown += `- \`${file.project}/${file.file}\`\n`;
+        });
+        markdown += '\n</details>\n\n';
+    }
+    
+    // Collapsible: QUnit Modules
+    const modulesList = Object.entries(projectModules)
+        .filter(([key]) => key !== 'changedSourceFiles')
+        .flatMap(([project, modules]) => 
+            modules.map(m => ({ project, ...m }))
+        );
+    
+    if (modulesList.length > 0) {
+        markdown += '<details>\n';
+        markdown += '<summary>📦 QUnit Modules Tested (' + modulesList.length + ')</summary>\n\n';
+        modulesList.forEach(mod => {
+            markdown += `- **${mod.project}/${mod.module}**\n`;
+            markdown += `  - Total: ${mod.allTests.length} tests\n`;
+            markdown += `  - Changed: ${mod.changedTests.length} tests\n`;
+        });
+        markdown += '\n</details>\n\n';
+    }
+    
+    // Test Results Table (only changed + failed)
     const testsToShow = allTestResults.filter(t => t.changed || t.status === 'failed');
     
     if (testsToShow.length > 0) {
-        markdown += '### Test Results\n\n';
+        markdown += '### 🧪 Test Results\n\n';
         markdown += '| Project | Module | Test | Status | Type |\n';
         markdown += '|---------|--------|------|:------:|------|\n';
         
@@ -178,16 +209,6 @@ function generateMarkdownTable(projectModules, allTestResults) {
         
         markdown += '\n';
     }
-    
-    // Modules tested - bulleted list
-    const modulesList = Object.entries(projectModules)
-        .filter(([key]) => key !== 'changedSourceFiles')
-        .flatMap(([project, modules]) => 
-            modules.map(m => `- ${project}/${m.module} (${m.allTests.length} tests, ${m.changedTests.length} changed)`)
-        )
-        .join('\n');
-    
-    markdown += `📦 Modules:\n${modulesList}\n\n`;
     
     markdown += '---\n';
     markdown += `<sub>📅 ${new Date().toUTCString()}</sub>\n`;

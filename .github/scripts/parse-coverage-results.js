@@ -118,9 +118,7 @@ function generateMarkdownTable(coverageResults) {
     }
 
     const lines = [
-        '## 📊 Code Coverage Report',
-        '',
-        '**Coverage for Changed Files Only**',
+        '### 📊 Code Coverage',
         '',
         '| Project | File | Statements | Branches | Functions | Lines |',
         '|---------|------|------------|----------|-----------|-------|'
@@ -142,7 +140,7 @@ function generateMarkdownTable(coverageResults) {
     });
 
     lines.push('');
-    lines.push('_Coverage percentages: Statements / Branches / Functions / Lines_');
+    lines.push('_Coverage for changed files only (Statements / Branches / Functions / Lines)_');
     lines.push('');
 
     return lines.join('\n');
@@ -218,7 +216,7 @@ function main() {
  */
 function addSkipMessage(reason) {
     const skipMessage = [
-        '## 📊 Code Coverage Report',
+        '### 📊 Code Coverage',
         '',
         `_Coverage report skipped: ${reason}_`,
         ''
