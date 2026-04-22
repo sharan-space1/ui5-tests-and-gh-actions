@@ -184,10 +184,10 @@ function generateMarkdownTable(projectModules, allTestResults) {
     if (modulesList.length > 0) {
         markdown += '<details>\n';
         markdown += '<summary>📦 QUnit Modules Tested (' + modulesList.length + ')</summary>\n\n';
+        markdown += '| Project | Module | Total Tests | Changed Tests |\n';
+        markdown += '|---------|--------|------------:|--------------:|\n';
         modulesList.forEach(mod => {
-            markdown += `- **${mod.project}/${mod.module}**\n`;
-            markdown += `  - Total: ${mod.allTests.length} tests\n`;
-            markdown += `  - Changed: ${mod.changedTests.length} tests\n`;
+            markdown += `| ${mod.project} | ${mod.module} | ${mod.allTests.length} | ${mod.changedTests.length} |\n`;
         });
         markdown += '\n</details>\n\n';
     }
@@ -209,9 +209,6 @@ function generateMarkdownTable(projectModules, allTestResults) {
         
         markdown += '\n';
     }
-    
-    markdown += '---\n';
-    markdown += `<sub>📅 ${new Date().toUTCString()}</sub>\n`;
     
     return markdown;
 }
