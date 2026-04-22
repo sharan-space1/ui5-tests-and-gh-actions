@@ -8,3 +8,13 @@ mta-*
 resources
 archive.zip
 .*_mta_build_tmp
+
+
+# Test results and reports
+test-results/
+*.log
+
+# Coverage reports
+tmp/
+coverage/
+.nyc_output/
