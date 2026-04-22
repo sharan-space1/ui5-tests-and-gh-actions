@@ -216,11 +216,11 @@ function formatBadge(coverage) {
     const counts = `(${coverage.covered}/${coverage.total})`;
     
     if (pct >= 80) {
-        return `🟢 ${pct}% ${counts}`;
+        return `<nobr>🟢 ${pct}%${counts}</nobr>`;
     } else if (pct >= 50) {
-        return `🟡 ${pct}% ${counts}`;
+        return `<nobr>🟡 ${pct}%${counts}</nobr>`;
     } else {
-        return `🔴 ${pct}% ${counts}`;
+        return `<nobr>🔴 ${pct}%${counts}</nobr>`;
     }
 }
 
