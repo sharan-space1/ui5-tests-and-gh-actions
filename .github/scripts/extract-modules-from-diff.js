@@ -69,19 +69,23 @@ function getChangedLineRanges(filePath, baseRef, headRef) {
  */
 function extractModuleAndTests(filePath, baseRef, headRef) {
     try {
+        console.log(`[extract-modules] Reading file: ${filePath}`);
         const content = fs.readFileSync(filePath, 'utf8');
+        console.log(`[extract-modules] File size: ${content.length} bytes`);
         
         // Extract module name
         const moduleMatch = content.match(/QUnit\.module\s*\(\s*["']([^"']+)["']/);
         if (!moduleMatch) {
-            console.warn(`Warning: No QUnit.module found in ${filePath}`);
+            console.warn(`[extract-modules] ⚠ Warning: No QUnit.module found in ${filePath}`);
             return null;
         }
         
         const moduleName = moduleMatch[1];
+        console.log(`[extract-modules] ✓ Found module: "${moduleName}"`);
         
         // Get changed line ranges
         const changedRanges = getChangedLineRanges(filePath, baseRef, headRef);
+        console.log(`[extract-modules] Changed line ranges:`, changedRanges);
         
         // Extract all tests with their line numbers
         const tests = [];
@@ -96,12 +100,16 @@ function extractModuleAndTests(filePath, baseRef, headRef) {
             const isChanged = changedRanges.length === 0 || 
                             changedRanges.some(range => lineNumber >= range.start && lineNumber <= range.end);
             
+            console.log(`[extract-modules]   Test: "${testName}" at line ${lineNumber} - ${isChanged ? 'CHANGED' : 'unchanged'}`);
+            
             tests.push({
                 name: testName,
                 line: lineNumber,
                 changed: isChanged
             });
         }
+        
+        console.log(`[extract-modules] ✓ Found ${tests.length} tests total, ${tests.filter(t => t.changed).length} changed`);
         
         return {
             module: moduleName,
@@ -121,31 +129,39 @@ function main() {
     const baseRef = process.env.GIT_BASE_REF || 'HEAD~1';
     const headRef = process.env.GIT_HEAD_REF || 'HEAD';
     
-    console.log(`Extracting modules from ${baseRef}..${headRef}\n`);
+    console.log('[extract-modules] ========================================');
+    console.log('[extract-modules] Starting module extraction...');
+    console.log(`[extract-modules] Extracting modules from ${baseRef}..${headRef}`);
+    console.log('[extract-modules] ========================================\n');
     
     const changedFiles = getChangedTestFiles(baseRef, headRef);
+    console.log(`[extract-modules] Changed files detected: ${changedFiles.length}\n`);
     
     if (changedFiles.length === 0) {
-        console.log('No test files changed.');
+        console.log('[extract-modules] No test files changed.');
         fs.writeFileSync('modules-to-test.json', JSON.stringify({}, null, 2));
+        console.log('[extract-modules] ✓ Created empty modules-to-test.json');
         process.exit(0);
     }
     
-    console.log(`Found ${changedFiles.length} changed test file(s):\n`);
+    console.log(`[extract-modules] Found ${changedFiles.length} changed test file(s):\n`);
     
     const projectModules = {};
     
     changedFiles.forEach(file => {
-        console.log(`Processing: ${file}`);
+        console.log(`[extract-modules] ========================================`);
+        console.log(`[extract-modules] Processing: ${file}`);
         
         // Extract project name (first folder segment)
         const projectName = file.split('/')[0];
+        console.log(`[extract-modules] Project: ${projectName}`);
         
         const moduleInfo = extractModuleAndTests(file, baseRef, headRef);
         
         if (moduleInfo) {
             if (!projectModules[projectName]) {
                 projectModules[projectName] = [];
+                console.log(`[extract-modules] Created new project entry: ${projectName}`);
             }
             
             projectModules[projectName].push({
@@ -155,17 +171,26 @@ function main() {
                 allTests: moduleInfo.tests.map(t => t.name)
             });
             
-            console.log(`  Module: "${moduleInfo.module}"`);
-            console.log(`  Changed tests: ${moduleInfo.changedTests.length}`);
-            console.log(`  Total tests: ${moduleInfo.tests.length}\n`);
+            console.log(`[extract-modules] ✓ Module: "${moduleInfo.module}"`);
+            console.log(`[extract-modules] ✓ Changed tests: ${moduleInfo.changedTests.length}`);
+            console.log(`[extract-modules] ✓ Total tests: ${moduleInfo.tests.length}`);
+        } else {
+            console.log(`[extract-modules] ✗ Failed to extract module info`);
         }
+        console.log('');
     });
     
     // Write output
-    fs.writeFileSync('modules-to-test.json', JSON.stringify(projectModules, null, 2));
+    console.log('[extract-modules] ========================================');
+    console.log('[extract-modules] Writing output...');
+    const outputJson = JSON.stringify(projectModules, null, 2);
+    console.log('[extract-modules] Output JSON:');
+    console.log(outputJson);
+    fs.writeFileSync('modules-to-test.json', outputJson);
     
-    console.log('✓ Created modules-to-test.json');
-    console.log(`✓ Projects with changes: ${Object.keys(projectModules).join(', ')}`);
+    console.log('[extract-modules] ✓ Created modules-to-test.json');
+    console.log(`[extract-modules] ✓ Projects with changes: ${Object.keys(projectModules).join(', ')}`);
+    console.log('[extract-modules] ========================================');
 }
 
 main();

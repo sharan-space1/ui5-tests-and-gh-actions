@@ -4,6 +4,8 @@ const fs = require('fs');
  * Parse QUnit test results from WDIO/QUnit log output
  */
 function parseQUnitResults(logContent, moduleName) {
+    console.log(`[parseQUnitResults] Parsing results for module: "${moduleName}"`);
+    
     const results = {
         total: 0,
         passed: 0,
@@ -12,6 +14,7 @@ function parseQUnitResults(logContent, moduleName) {
     };
     
     const lines = logContent.split('\n');
+    console.log(`[parseQUnitResults]   Log has ${lines.length} lines`);
     
     // Look for QUnit test results
     // Common patterns: "✓ test name" or "✗ test name" or lines with "passed" / "failed"
@@ -71,6 +74,7 @@ function parseQUnitResults(logContent, moduleName) {
     }
     
     results.total = results.passed + results.failed;
+    console.log(`[parseQUnitResults]   ✓ Parsed ${results.total} tests (${results.passed} passed, ${results.failed} failed)`);
     return results;
 }
 
@@ -146,31 +150,46 @@ function generateMarkdownTable(projectModules, allTestResults) {
  * Main function
  */
 function main() {
+    console.log('[parse-qunit-results] ========================================');
+    console.log('[parse-qunit-results] Starting results parsing...');
+    console.log('[parse-qunit-results] ========================================\n');
+    
     // Read modules-to-test.json
     if (!fs.existsSync('modules-to-test.json')) {
-        console.error('modules-to-test.json not found');
+        console.error('[parse-qunit-results] ✗ modules-to-test.json not found');
         process.exit(1);
     }
     
+    console.log('[parse-qunit-results] Reading modules-to-test.json...');
     const projectModules = JSON.parse(fs.readFileSync('modules-to-test.json', 'utf8'));
+    console.log('[parse-qunit-results] Project modules:', JSON.stringify(projectModules, null, 2));
     
     if (Object.keys(projectModules).length === 0) {
-        console.log('No modules to test');
+        console.log('[parse-qunit-results] No modules to test');
         process.exit(0);
     }
     
     // Read test results from all projects
     const allResults = [];
     
+    console.log('[parse-qunit-results] ========================================');
+    console.log('[parse-qunit-results] Processing test results...\n');
+    
     Object.entries(projectModules).forEach(([project, modules]) => {
         const logFile = `${project}-test-output.log`;
         
+        console.log(`[parse-qunit-results] Project: ${project}`);
+        console.log(`[parse-qunit-results]   Looking for log file: ${logFile}`);
+        
         if (fs.existsSync(logFile)) {
-            console.log(`Parsing results for ${project}...`);
+            console.log(`[parse-qunit-results]   ✓ Found log file`);
             const logContent = fs.readFileSync(logFile, 'utf8');
+            console.log(`[parse-qunit-results]   Log file size: ${logContent.length} bytes`);
             
             modules.forEach(moduleInfo => {
-                console.log(`  Module: ${moduleInfo.module}`);
+                console.log(`[parse-qunit-results]   Module: ${moduleInfo.module}`);
+                console.log(`[parse-qunit-results]     Changed tests: ${moduleInfo.changedTests.join(', ')}`);
+                console.log(`[parse-qunit-results]     All tests: ${moduleInfo.allTests.join(', ')}`);
                 
                 // Parse results for this module
                 const results = parseQUnitResults(logContent, moduleInfo.module);
@@ -179,27 +198,34 @@ function main() {
                 results.tests.forEach(test => {
                     test.project = project;
                     test.changed = moduleInfo.changedTests.includes(test.name);
+                    console.log(`[parse-qunit-results]       Test: "${test.name}" - ${test.status} - ${test.changed ? 'CHANGED' : 'unchanged'}`);
                 });
                 
-                console.log(`    Found ${results.tests.length} test results (${results.passed} passed, ${results.failed} failed)`);
+                console.log(`[parse-qunit-results]     ✓ Found ${results.tests.length} test results (${results.passed} passed, ${results.failed} failed)`);
                 
                 allResults.push(...results.tests);
             });
         } else {
-            console.warn(`Warning: Log file not found: ${logFile}`);
+            console.warn(`[parse-qunit-results]   ⚠ Warning: Log file not found: ${logFile}`);
         }
+        console.log('');
     });
     
     // Generate markdown
+    console.log('[parse-qunit-results] ========================================');
+    console.log('[parse-qunit-results] Generating markdown...');
     const markdown = generateMarkdownTable(projectModules, allResults);
     
     // Write to file
     fs.writeFileSync('pr-comment.md', markdown);
     
-    console.log('\n✓ Generated PR comment markdown');
-    console.log(`✓ Total test results: ${allResults.length}`);
-    console.log(`✓ Changed tests: ${allResults.filter(t => t.changed).length}`);
-    console.log(`✓ Failed tests: ${allResults.filter(t => t.status === 'failed').length}`);
+    console.log('[parse-qunit-results] ========================================');
+    console.log('[parse-qunit-results] Summary:');
+    console.log(`[parse-qunit-results]   ✓ Total test results: ${allResults.length}`);
+    console.log(`[parse-qunit-results]   ✓ Changed tests: ${allResults.filter(t => t.changed).length}`);
+    console.log(`[parse-qunit-results]   ✓ Failed tests: ${allResults.filter(t => t.status === 'failed').length}`);
+    console.log('[parse-qunit-results]   ✓ Generated PR comment markdown');
+    console.log('[parse-qunit-results] ========================================');
 }
 
 main();

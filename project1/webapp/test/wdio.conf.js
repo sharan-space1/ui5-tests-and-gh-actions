@@ -65,22 +65,35 @@ exports.config = {
     // Hooks
     // =======================
     before: function () {
+        console.log('[wdio.conf.js] ======================================');
+        console.log('[wdio.conf.js] Before hook executing...');
+        console.log('[wdio.conf.js] ======================================');
+        
         // Inject TEST_MODULES from environment variable into browser context
         const modulesString = process.env.TEST_MODULES_LIST;
+        console.log('[wdio.conf.js] process.env.TEST_MODULES_LIST:', modulesString);
         
         if (modulesString) {
-            console.log('Injecting TEST_MODULES into browser context...');
+            console.log('[wdio.conf.js] ✓ Found TEST_MODULES_LIST environment variable');
             const modules = modulesString.split(',').map(m => m.trim());
-            console.log(`Modules to test: ${modules.join(', ')}`);
+            console.log('[wdio.conf.js] Parsed modules array:', modules);
+            console.log('[wdio.conf.js] Module count:', modules.length);
             
             // Inject into browser's window object
+            console.log('[wdio.conf.js] Injecting into browser context as window.TEST_MODULES...');
             browser.execute((mods) => {
+                console.log('[Browser Context] Received modules:', mods);
                 window.TEST_MODULES = mods;
+                console.log('[Browser Context] window.TEST_MODULES set to:', window.TEST_MODULES);
             }, modules);
             
-            console.log('✓ TEST_MODULES injected successfully');
+            console.log('[wdio.conf.js] ✓ TEST_MODULES injected successfully');
+            console.log('[wdio.conf.js] Modules to test:', modules.join(', '));
         } else {
-            console.log('No TEST_MODULES_LIST env variable found. Running with default modules.');
+            console.log('[wdio.conf.js] ⚠ No TEST_MODULES_LIST env variable found');
+            console.log('[wdio.conf.js] Browser will use fallback modules from unitTests.qunit.js');
         }
+        
+        console.log('[wdio.conf.js] ======================================');
     }
 };
