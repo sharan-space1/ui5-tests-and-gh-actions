@@ -260,4 +260,181 @@ sap.ui.define([
 		assert.deepEqual(result.data.permissions, ["read"], "Viewer should have read permission");
 	});
 
+	QUnit.test("processUserData should return error for invalid data type", function (assert) {
+		var oController = new Controller();
+		var result = oController.processUserData("not an object");
+		assert.strictEqual(result.status, "error", "Status should be error");
+		assert.strictEqual(result.error, "Invalid data type", "Error message should be correct");
+	});
+
+	QUnit.test("processUserData should handle missing name", function (assert) {
+		var oController = new Controller();
+		var userData = { age: 30, email: "test@example.com" };
+		var result = oController.processUserData(userData);
+		assert.strictEqual(result.status, "success", "Status should be success");
+		assert.strictEqual(result.data.name, "Unknown", "Name should default to Unknown");
+		assert.ok(result.warnings.includes("Name is missing"), "Should warn about missing name");
+	});
+
+	QUnit.test("processUserData should handle empty name", function (assert) {
+		var oController = new Controller();
+		var userData = { name: "   ", age: 30, email: "test@example.com" };
+		var result = oController.processUserData(userData);
+		assert.strictEqual(result.data.name, "Unknown", "Empty name should default to Unknown");
+		assert.ok(result.warnings.includes("Name is missing"), "Should warn about missing name");
+	});
+
+	QUnit.test("processUserData should handle name too short", function (assert) {
+		var oController = new Controller();
+		var userData = { name: "AB", age: 30, email: "test@example.com" };
+		var result = oController.processUserData(userData);
+		assert.strictEqual(result.status, "success", "Status should be success");
+		assert.strictEqual(result.data.name, "AB", "Short name should be preserved");
+		assert.ok(result.warnings.includes("Name is too short"), "Should warn about short name");
+	});
+
+	QUnit.test("processUserData should handle name too long", function (assert) {
+		var oController = new Controller();
+		var longName = "A".repeat(60);
+		var userData = { name: longName, age: 30, email: "test@example.com" };
+		var result = oController.processUserData(userData);
+		assert.strictEqual(result.status, "success", "Status should be success");
+		assert.strictEqual(result.data.name.length, 50, "Name should be truncated to 50 chars");
+		assert.ok(result.warnings.includes("Name is too long"), "Should warn about long name");
+	});
+
+	QUnit.test("processUserData should handle missing age", function (assert) {
+		var oController = new Controller();
+		var userData = { name: "John", email: "test@example.com" };
+		var result = oController.processUserData(userData);
+		assert.strictEqual(result.status, "success", "Status should be success");
+		assert.strictEqual(result.data.age, 0, "Age should default to 0");
+		assert.ok(result.warnings.includes("Age is missing"), "Should warn about missing age");
+	});
+
+	QUnit.test("processUserData should handle non-number age", function (assert) {
+		var oController = new Controller();
+		var userData = { name: "John", age: "thirty", email: "test@example.com" };
+		var result = oController.processUserData(userData);
+		assert.strictEqual(result.status, "success", "Status should be success");
+		assert.strictEqual(result.data.age, 0, "Invalid age should default to 0");
+		assert.ok(result.warnings.includes("Age must be a number"), "Should warn about invalid age type");
+	});
+
+	QUnit.test("processUserData should handle negative age", function (assert) {
+		var oController = new Controller();
+		var userData = { name: "John", age: -5, email: "test@example.com" };
+		var result = oController.processUserData(userData);
+		assert.strictEqual(result.status, "success", "Status should be success");
+		assert.strictEqual(result.data.age, 0, "Negative age should default to 0");
+		assert.ok(result.warnings.includes("Age cannot be negative"), "Should warn about negative age");
+	});
+
+	QUnit.test("processUserData should categorize minor users", function (assert) {
+		var oController = new Controller();
+		var userData = { name: "Tommy", age: 15, email: "tommy@example.com" };
+		var result = oController.processUserData(userData);
+		assert.strictEqual(result.status, "success", "Status should be success");
+		assert.strictEqual(result.data.age, 15, "Age should be set");
+		assert.strictEqual(result.data.category, "minor", "Category should be minor");
+	});
+
+	QUnit.test("processUserData should categorize senior users", function (assert) {
+		var oController = new Controller();
+		var userData = { name: "Bob", age: 70, email: "bob@example.com" };
+		var result = oController.processUserData(userData);
+		assert.strictEqual(result.status, "success", "Status should be success");
+		assert.strictEqual(result.data.age, 70, "Age should be set");
+		assert.strictEqual(result.data.category, "senior", "Category should be senior");
+	});
+
+	QUnit.test("processUserData should handle missing email", function (assert) {
+		var oController = new Controller();
+		var userData = { name: "John", age: 30 };
+		var result = oController.processUserData(userData);
+		assert.strictEqual(result.status, "success", "Status should be success");
+		assert.ok(result.warnings.includes("Email is missing"), "Should warn about missing email");
+	});
+
+	QUnit.test("processUserData should handle invalid email format", function (assert) {
+		var oController = new Controller();
+		var userData = { name: "John", age: 30, email: "not-an-email" };
+		var result = oController.processUserData(userData);
+		assert.strictEqual(result.status, "success", "Status should be success");
+		assert.ok(result.warnings.includes("Email format is invalid"), "Should warn about invalid email");
+	});
+
+	QUnit.test("processUserData should handle admin role", function (assert) {
+		var oController = new Controller();
+		var userData = { 
+			name: "Admin User", 
+			age: 35, 
+			email: "admin@example.com",
+			role: "admin"
+		};
+		var result = oController.processUserData(userData);
+		assert.strictEqual(result.status, "success", "Status should be success");
+		assert.deepEqual(result.data.permissions, ["read", "write", "delete", "admin"], "Admin should have all permissions");
+	});
+
+	QUnit.test("processUserData should handle unknown role", function (assert) {
+		var oController = new Controller();
+		var userData = { 
+			name: "User", 
+			age: 30, 
+			email: "user@example.com",
+			role: "manager"
+		};
+		var result = oController.processUserData(userData);
+		assert.strictEqual(result.status, "success", "Status should be success");
+		assert.deepEqual(result.data.permissions, ["read"], "Unknown role should default to read permission");
+		assert.ok(result.warnings.includes("Unknown role, defaulting to viewer"), "Should warn about unknown role");
+	});
+
+	QUnit.test("processUserData should handle missing role", function (assert) {
+		var oController = new Controller();
+		var userData = { name: "User", age: 30, email: "user@example.com" };
+		var result = oController.processUserData(userData);
+		assert.strictEqual(result.status, "success", "Status should be success");
+		assert.deepEqual(result.data.permissions, ["read"], "Missing role should default to read permission");
+	});
+
+	QUnit.test("processUserData should handle inactive status", function (assert) {
+		var oController = new Controller();
+		var userData = { 
+			name: "User", 
+			age: 30, 
+			email: "user@example.com",
+			active: false
+		};
+		var result = oController.processUserData(userData);
+		assert.strictEqual(result.status, "success", "Status should be success");
+		assert.strictEqual(result.data.status, "inactive", "Status should be inactive");
+	});
+
+	QUnit.test("processUserData should handle unknown active status", function (assert) {
+		var oController = new Controller();
+		var userData = { name: "User", age: 30, email: "user@example.com" };
+		var result = oController.processUserData(userData);
+		assert.strictEqual(result.status, "success", "Status should be success");
+		assert.strictEqual(result.data.status, "unknown", "Status should be unknown when active not set");
+	});
+
+	QUnit.test("processUserData should handle multiple warnings", function (assert) {
+		var oController = new Controller();
+		var userData = { 
+			name: "AB",
+			age: -10,
+			email: "invalid-email",
+			role: "unknown-role"
+		};
+		var result = oController.processUserData(userData);
+		assert.strictEqual(result.status, "success", "Status should be success");
+		assert.ok(result.warnings.length > 0, "Should have multiple warnings");
+		assert.ok(result.warnings.includes("Name is too short"), "Should warn about short name");
+		assert.ok(result.warnings.includes("Age cannot be negative"), "Should warn about negative age");
+		assert.ok(result.warnings.includes("Email format is invalid"), "Should warn about invalid email");
+		assert.ok(result.warnings.includes("Unknown role, defaulting to viewer"), "Should warn about unknown role");
+	});
+
 });
