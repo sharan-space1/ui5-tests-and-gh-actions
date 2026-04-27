@@ -14,7 +14,7 @@ function getChangedTestFiles(baseRef, headRef) {
         
         const files = diff.split('\n')
             .filter(f => f.trim().length > 0)
-            .filter(f => f.includes('/webapp/test/unit/') && f.endsWith('.js'))
+            .filter(f => f.includes('/webapp/test/unit/') && (f.endsWith('.js') || f.endsWith('.test.js')))
             .filter(f => {
                 const fileName = path.basename(f);
                 const excludePatterns = [
