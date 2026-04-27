@@ -212,7 +212,7 @@ sap.ui.define([
 		var oController = new Controller();
 		assert.strictEqual(oController.something4("hello", "world"), "hello&world", "Two strings concatenated with +");
 		assert.strictEqual(oController.something4("test", "123"), "test&123", "String and number concatenated");
-		assert.strictEqual(oController.something4("a", "bb"), "a&b", "Single characters concatenated");
+		assert.strictEqual(oController.something4("a", "b"), "a&b", "Single characters concatenated");
 		assert.strictEqual(oController.something4("first", undefined), "first&undefined", "Second parameter undefined");
 		assert.strictEqual(oController.something4("", "second"), "Invalid", "Empty string returns Invalid");
 		assert.strictEqual(oController.something4(null, "second"), "Invalid", "Null first parameter returns Invalid");
