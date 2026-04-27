@@ -9,7 +9,7 @@ function parseCoverageResults() {
     console.log('[parse-coverage] Starting coverage result parsing...');
     console.log('[parse-coverage] ========================================\n');
 
-    const modulesData = JSON.parse(fs.readFileSync('modules-to-test.json', 'utf8'));
+    const modulesData = JSON.parse(fs.readFileSync('ui-modules-to-test.json', 'utf8'));
     const changedSourceFiles = modulesData.changedSourceFiles || [];
 
     console.log(`[parse-coverage] Changed source files: ${changedSourceFiles.length}`);
@@ -294,14 +294,14 @@ function formatBadge(coverage) {
  * Main function
  */
 function main() {
-    // Check if modules-to-test.json exists
-    if (!fs.existsSync('modules-to-test.json')) {
-        console.log('[parse-coverage] No modules-to-test.json found - skipping coverage report');
+    // Check if ui-modules-to-test.json exists
+    if (!fs.existsSync('ui-modules-to-test.json')) {
+        console.log('[parse-coverage] No ui-modules-to-test.json found - skipping coverage report');
         addSkipMessage('No test changes detected');
         return;
     }
 
-    const modulesData = JSON.parse(fs.readFileSync('modules-to-test.json', 'utf8'));
+    const modulesData = JSON.parse(fs.readFileSync('ui-modules-to-test.json', 'utf8'));
     const changedSourceFiles = modulesData.changedSourceFiles || [];
 
     if (changedSourceFiles.length === 0) {
@@ -325,25 +325,25 @@ function main() {
         return;
     }
 
-    // Append to pr-comment.md if it exists, otherwise create new
+    // Append to ui-pr-comment.md if it exists, otherwise create new
     let existingComment = '';
-    if (fs.existsSync('pr-comment.md')) {
-        existingComment = fs.readFileSync('pr-comment.md', 'utf8');
-        console.log('[parse-coverage] ✓ Appending to existing pr-comment.md');
+    if (fs.existsSync('ui-pr-comment.md')) {
+        existingComment = fs.readFileSync('ui-pr-comment.md', 'utf8');
+        console.log('[parse-coverage] ✓ Appending to existing ui-pr-comment.md');
     } else {
-        console.log('[parse-coverage] ✓ Creating new pr-comment.md');
+        console.log('[parse-coverage] ✓ Creating new ui-pr-comment.md');
     }
 
     const updatedComment = existingComment + '\n\n' + markdownTable;
-    fs.writeFileSync('pr-comment.md', updatedComment);
+    fs.writeFileSync('ui-pr-comment.md', updatedComment);
 
     console.log('[parse-coverage] ========================================');
-    console.log('[parse-coverage] ✓ Coverage report added to pr-comment.md');
+    console.log('[parse-coverage] ✓ Coverage report added to ui-pr-comment.md');
     console.log('[parse-coverage] ========================================');
 }
 
 /**
- * Add skip message to pr-comment.md
+ * Add skip message to ui-pr-comment.md
  */
 function addSkipMessage(reason) {
     const skipMessage = [
@@ -354,14 +354,14 @@ function addSkipMessage(reason) {
     ].join('\n');
 
     let existingComment = '';
-    if (fs.existsSync('pr-comment.md')) {
-        existingComment = fs.readFileSync('pr-comment.md', 'utf8');
+    if (fs.existsSync('ui-pr-comment.md')) {
+        existingComment = fs.readFileSync('ui-pr-comment.md', 'utf8');
     }
 
     const updatedComment = existingComment + '\n\n' + skipMessage;
-    fs.writeFileSync('pr-comment.md', updatedComment);
+    fs.writeFileSync('ui-pr-comment.md', updatedComment);
 
-    console.log('[parse-coverage] ✓ Skip message added to pr-comment.md');
+    console.log('[parse-coverage] ✓ Skip message added to ui-pr-comment.md');
 }
 
 main();

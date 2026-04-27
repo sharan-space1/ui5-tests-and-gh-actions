@@ -8,3 +8,8 @@ mta-*
 resources
 archive.zip
 .*_mta_build_tmp
+
+# UI5 test runtime files
+ui-modules-to-test.json
+ui-pr-comment.md
+*-ui-test-output.log

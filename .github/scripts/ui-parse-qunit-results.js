@@ -221,14 +221,14 @@ function main() {
     console.log('[parse-qunit-results] Starting results parsing...');
     console.log('[parse-qunit-results] ========================================\n');
     
-    // Read modules-to-test.json
-    if (!fs.existsSync('modules-to-test.json')) {
-        console.error('[parse-qunit-results] ✗ modules-to-test.json not found');
+    // Read ui-modules-to-test.json
+    if (!fs.existsSync('ui-modules-to-test.json')) {
+        console.error('[parse-qunit-results] ✗ ui-modules-to-test.json not found');
         process.exit(1);
     }
     
-    console.log('[parse-qunit-results] Reading modules-to-test.json...');
-    const projectModules = JSON.parse(fs.readFileSync('modules-to-test.json', 'utf8'));
+    console.log('[parse-qunit-results] Reading ui-modules-to-test.json...');
+    const projectModules = JSON.parse(fs.readFileSync('ui-modules-to-test.json', 'utf8'));
     console.log('[parse-qunit-results] Project modules:', JSON.stringify(projectModules, null, 2));
     
     const projectKeys = Object.keys(projectModules).filter(k => k !== 'changedSourceFiles');
@@ -246,7 +246,7 @@ function main() {
     Object.entries(projectModules)
         .filter(([key]) => key !== 'changedSourceFiles') // Skip non-project keys
         .forEach(([project, modules]) => {
-        const logFile = `${project}-test-output.log`;
+        const logFile = `${project}-ui-test-output.log`;
         
         console.log(`[parse-qunit-results] Project: ${project}`);
         console.log(`[parse-qunit-results]   Looking for log file: ${logFile}`);
@@ -287,7 +287,7 @@ function main() {
     const markdown = generateMarkdownTable(projectModules, allResults);
     
     // Write to file
-    fs.writeFileSync('pr-comment.md', markdown);
+    fs.writeFileSync('ui-pr-comment.md', markdown);
     
     console.log('[parse-qunit-results] ========================================');
     console.log('[parse-qunit-results] Summary:');

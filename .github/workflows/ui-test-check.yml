@@ -32,10 +32,10 @@ jobs:
           GIT_BASE_REF: ${{ github.event.pull_request.base.sha }}
           GIT_HEAD_REF: ${{ github.event.pull_request.head.sha }}
         run: |
-          node .github/scripts/extract-modules-from-diff.js
+          node .github/scripts/ui-extract-modules-from-diff.js
           
-          # Check if modules-to-test.json exists
-          if [ ! -f "modules-to-test.json" ]; then
+          # Check if ui-modules-to-test.json exists
+          if [ ! -f "ui-modules-to-test.json" ]; then
             echo "No changes detected"
             echo "has_source_changes=false" >> $GITHUB_OUTPUT
             echo "should_run_tests=false" >> $GITHUB_OUTPUT
@@ -43,8 +43,8 @@ jobs:
           fi
           
           # Count source files and test projects
-          SOURCE_COUNT=$(cat modules-to-test.json | jq '.changedSourceFiles | length')
-          TEST_PROJECTS=$(cat modules-to-test.json | jq 'to_entries | map(select(.key != "changedSourceFiles")) | length')
+          SOURCE_COUNT=$(cat ui-modules-to-test.json | jq '.changedSourceFiles | length')
+          TEST_PROJECTS=$(cat ui-modules-to-test.json | jq 'to_entries | map(select(.key != "changedSourceFiles")) | length')
           
           echo "📊 Change Summary:"
           echo "  Source files changed: $SOURCE_COUNT"
@@ -67,7 +67,7 @@ jobs:
             echo "Please include or update at least one test file matching *.test.js or *Test.js."
             echo ""
             echo "Changed source files:"
-            cat modules-to-test.json | jq -r '.changedSourceFiles[] | "  - \(.project)/\(.file)"'
+            cat ui-modules-to-test.json | jq -r '.changedSourceFiles[] | "  - \(.project)/\(.file)"'
             exit 1
           else
             # Source files changed AND tests exist - proceed
@@ -82,8 +82,8 @@ jobs:
           CI: true
           GITHUB_ACTIONS: true
         run: |
-          echo "Reading modules-to-test.json..."
-          MODULES_JSON=$(cat modules-to-test.json)
+          echo "Reading ui-modules-to-test.json..."
+          MODULES_JSON=$(cat ui-modules-to-test.json)
           
           # Loop through each project
           echo "$MODULES_JSON" | jq -r 'keys[]' | while read project; do
@@ -115,7 +115,7 @@ jobs:
             echo ""
             
             # Run tests (wdio.conf.js will inject modules into window.TEST_MODULES)
-            npm run unit-test-headless 2>&1 | tee "../${project}-test-output.log" || true
+            npm run unit-test-headless 2>&1 | tee "../${project}-ui-test-output.log" || true
             
             cd ..
             echo ""
@@ -128,7 +128,7 @@ jobs:
         run: |
           echo "Validating coverage files..."
           
-          MODULES_JSON=$(cat modules-to-test.json)
+          MODULES_JSON=$(cat ui-modules-to-test.json)
           echo "$MODULES_JSON" | jq -r 'keys[] | select(. != "changedSourceFiles")' | while read project; do
             COVERAGE_FILE="${project}/tmp/coverage-reports/json/coverage-final.json"
             
@@ -148,12 +148,12 @@ jobs:
       - name: Parse results and generate comment
         if: steps.extract.outputs.should_run_tests == 'true'
         run: |
-          node .github/scripts/parse-qunit-results.js
+          node .github/scripts/ui-parse-qunit-results.js
       
       - name: Parse coverage results
         if: steps.extract.outputs.should_run_tests == 'true'
         run: |
-          node .github/scripts/parse-coverage-results.js
+          node .github/scripts/ui-parse-coverage-results.js
       
       - name: Post PR comment
         if: steps.extract.outputs.should_run_tests == 'true'
@@ -162,12 +162,12 @@ jobs:
           script: |
             const fs = require('fs');
             
-            if (!fs.existsSync('pr-comment.md')) {
-              console.log('No pr-comment.md found');
+            if (!fs.existsSync('ui-pr-comment.md')) {
+              console.log('No ui-pr-comment.md found');
               return;
             }
             
-            const commentBody = fs.readFileSync('pr-comment.md', 'utf8');
+            const commentBody = fs.readFileSync('ui-pr-comment.md', 'utf8');
             
             // Find existing comments from this workflow
             const { data: comments } = await github.rest.issues.listComments({
@@ -223,7 +223,7 @@ jobs:
         with:
           name: test-results
           path: |
-            modules-to-test.json
-            *-test-output.log
-            pr-comment.md
+            ui-modules-to-test.json
+            *-ui-test-output.log
+            ui-pr-comment.md
           retention-days: 30
