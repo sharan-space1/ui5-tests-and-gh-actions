@@ -25,7 +25,7 @@ server:
       afterMiddleware: compression
       configuration:
         report:
-          reporter: ["html"]
+          reporter: ["html", "json"]
           "report-dir": "./tmp/coverage-reports"
           watermarks: {
             statements: [50, 80],

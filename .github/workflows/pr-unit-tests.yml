@@ -98,6 +98,11 @@ jobs:
         run: |
           node .github/scripts/parse-qunit-results.js
       
+      - name: Parse coverage results
+        if: steps.extract.outputs.has_modules == 'true'
+        run: |
+          node .github/scripts/parse-coverage-results.js
+      
       - name: Post PR comment
         if: steps.extract.outputs.has_modules == 'true'
         uses: actions/github-script@v7
