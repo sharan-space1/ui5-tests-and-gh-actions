@@ -78,7 +78,7 @@ function getChangedSourceFiles(baseRef, headRef, changedTestFiles) {
         // Combine and deduplicate
         const allSourceFiles = [...new Set([...modifiedSourceFiles, ...inferredSourceFiles])];
         
-        // Verify files exist and format output
+        // Verify files exist and format output WITH line ranges
         const result = allSourceFiles
             .filter(f => {
                 try {
@@ -94,10 +94,18 @@ function getChangedSourceFiles(baseRef, headRef, changedTestFiles) {
                 const webappIndex = f.indexOf('/webapp/');
                 const relativePath = webappIndex >= 0 ? f.substring(webappIndex + 8) : f;
                 
+                // Get changed line ranges for directly modified files
+                let changedRanges = [];
+                if (modifiedSourceFiles.includes(f)) {
+                    changedRanges = getChangedLineRanges(f, baseRef, headRef);
+                }
+                
                 return {
                     project: projectName,
                     file: relativePath,
-                    fullPath: f
+                    fullPath: f,
+                    changedRanges: changedRanges,
+                    isDirect: modifiedSourceFiles.includes(f) // true if directly modified, false if inferred from tests
                 };
             });
         

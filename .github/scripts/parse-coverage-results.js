@@ -14,9 +14,11 @@ function parseCoverageResults() {
 
     console.log(`[parse-coverage] Changed source files: ${changedSourceFiles.length}`);
     changedSourceFiles.forEach(f => {
-        console.log(`[parse-coverage]   - ${f.project}: ${f.file}`);
+        console.log(`[parse-coverage]   - ${f.project}: ${f.file}${f.changedRanges && f.changedRanges.length > 0 ? ` (${f.changedRanges.length} ranges)` : ''}`);
     });
     console.log('');
+
+    const coverageResults = [];
 
     // Group changed files by project
     const filesByProject = {};
@@ -24,10 +26,8 @@ function parseCoverageResults() {
         if (!filesByProject[f.project]) {
             filesByProject[f.project] = [];
         }
-        filesByProject[f.project].push(f.file);
+        filesByProject[f.project].push(f);
     });
-
-    const coverageResults = [];
 
     // Process each project
     Object.keys(filesByProject).forEach(project => {
@@ -45,7 +45,9 @@ function parseCoverageResults() {
         console.log(`[parse-coverage] ✓ Coverage file loaded for ${project}`);
 
         // Filter coverage data for changed files
-        filesByProject[project].forEach(file => {
+        filesByProject[project].forEach(sourceFile => {
+            const file = sourceFile.file;
+            
             // Try to find the file in coverage data
             // Coverage keys might have absolute paths or relative paths
             const matchingKeys = Object.keys(coverageData).filter(key => {
@@ -57,10 +59,10 @@ function parseCoverageResults() {
                 coverageResults.push({
                     project,
                     file,
-                    statements: { pct: 0 },
-                    branches: { pct: 0 },
-                    functions: { pct: 0 },
-                    lines: { pct: 0 },
+                    statements: { pct: 0, covered: 0, total: 0 },
+                    branches: { pct: 0, covered: 0, total: 0 },
+                    functions: { pct: 0, covered: 0, total: 0 },
+                    lines: { pct: 0, covered: 0, total: 0 },
                     noCoverage: true
                 });
                 return;
@@ -70,13 +72,18 @@ function parseCoverageResults() {
             const coverageKey = matchingKeys[0];
             const fileCoverage = coverageData[coverageKey];
 
-            // Calculate coverage percentages
-            const statements = calculateStatementCoverage(fileCoverage.s);
-            const branches = calculateBranchCoverage(fileCoverage.b);
-            const functions = calculateFunctionCoverage(fileCoverage.f);
-            const lines = calculateLineCoverage(fileCoverage.s, fileCoverage.statementMap);
+            // Calculate diff coverage - only for changed lines
+            const coverage = calculateDiffCoverage(fileCoverage, sourceFile.changedRanges || []);
+            
+            const statements = coverage.statements;
+            const branches = coverage.branches;
+            const functions = coverage.functions;
+            const lines = coverage.lines;
 
-            console.log(`[parse-coverage]   ✓ ${file}: S:${statements.pct}% B:${branches.pct}% F:${functions.pct}% L:${lines.pct}%`);
+            const rangeInfo = sourceFile.changedRanges && sourceFile.changedRanges.length > 0 
+                ? ` [diff coverage]` 
+                : ` [full file]`;
+            console.log(`[parse-coverage]   ✓ ${file}${rangeInfo}: S:${statements.pct}% B:${branches.pct}% F:${functions.pct}% L:${lines.pct}%`);
 
             coverageResults.push({
                 project,
@@ -172,6 +179,65 @@ function calculateLineCoverage(statements, statementMap) {
 }
 
 /**
+ * Check if a line is within any of the changed ranges
+ */
+function isLineInChangedRanges(line, ranges) {
+    if (!ranges || ranges.length === 0) {
+        return true; // If no ranges (inferred file), include all
+    }
+    return ranges.some(range => line >= range.start && line <= range.end);
+}
+
+/**
+ * Calculate diff coverage - only for changed lines
+ */
+function calculateDiffCoverage(fileCoverage, changedRanges) {
+    if (!changedRanges || changedRanges.length === 0) {
+        // No specific ranges - calculate full file coverage
+        return {
+            statements: calculateStatementCoverage(fileCoverage.s),
+            branches: calculateBranchCoverage(fileCoverage.b),
+            functions: calculateFunctionCoverage(fileCoverage.f),
+            lines: calculateLineCoverage(fileCoverage.s, fileCoverage.statementMap)
+        };
+    }
+    
+    // Filter statements to only changed lines
+    const filteredStatements = {};
+    Object.keys(fileCoverage.s).forEach(stmtId => {
+        const stmt = fileCoverage.statementMap[stmtId];
+        if (stmt && stmt.start && isLineInChangedRanges(stmt.start.line, changedRanges)) {
+            filteredStatements[stmtId] = fileCoverage.s[stmtId];
+        }
+    });
+    
+    // Filter branches to only changed lines
+    const filteredBranches = {};
+    Object.keys(fileCoverage.b).forEach(branchId => {
+        const branch = fileCoverage.branchMap[branchId];
+        if (branch && branch.loc && isLineInChangedRanges(branch.loc.start.line, changedRanges)) {
+            filteredBranches[branchId] = fileCoverage.b[branchId];
+        }
+    });
+    
+    // Filter functions to only changed lines
+    const filteredFunctions = {};
+    Object.keys(fileCoverage.f).forEach(fnId => {
+        const fn = fileCoverage.fnMap[fnId];
+        if (fn && fn.loc && isLineInChangedRanges(fn.loc.start.line, changedRanges)) {
+            filteredFunctions[fnId] = fileCoverage.f[fnId];
+        }
+    });
+    
+    return {
+        statements: calculateStatementCoverage(filteredStatements),
+        branches: calculateBranchCoverage(filteredBranches),
+        functions: calculateFunctionCoverage(filteredFunctions),
+        lines: calculateLineCoverage(filteredStatements, fileCoverage.statementMap)
+    };
+}
+
+/**
  * Generate markdown table
  */
 function generateMarkdownTable(coverageResults) {
@@ -202,7 +268,7 @@ function generateMarkdownTable(coverageResults) {
     });
 
     lines.push('');
-    lines.push('_Coverage for changed files only (Statements / Branches / Functions / Lines)_');
+    lines.push('_Coverage for changed lines only (diff coverage) - Statements / Branches / Functions / Lines_');
     lines.push('');
 
     return lines.join('\n');
