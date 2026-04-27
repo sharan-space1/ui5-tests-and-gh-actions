@@ -283,30 +283,20 @@ function generateMarkdownTable(coverageResults) {
     const meetsThreshold = overallCoverage.pct >= COVERAGE_THRESHOLD;
 
     const lines = [
-        '### 📊 Code Coverage',
+        '## 📊 Code Coverage',
         '',
-        `**${meetsThreshold ? '✅' : '❌'} Overall Coverage: ${overallCoverage.pct}%** (Threshold: ≥${COVERAGE_THRESHOLD}%)`,
+        `**Overall Coverage: ${overallCoverage.pct}%** (Threshold: ≥${COVERAGE_THRESHOLD}%)`,
         '',
-        '#### 📈 Coverage Breakdown',
-        '',
-        '<table>',
-        '<tr>',
-        '<th width="25%">Statements</th>',
-        '<th width="25%">Branches</th>',
-        '<th width="25%">Functions</th>',
-        '<th width="25%">Lines</th>',
-        '</tr>',
-        '<tr>',
-        `<td align="center">${formatBadgeInline(overallCoverage.statements)}</td>`,
-        `<td align="center">${formatBadgeInline(overallCoverage.branches)}</td>`,
-        `<td align="center">${formatBadgeInline(overallCoverage.functions)}</td>`,
-        `<td align="center">${formatBadgeInline(overallCoverage.lines)}</td>`,
-        '</tr>',
-        '</table>',
+        '| Metric | Coverage |',
+        '|--------|----------|',
+        `| Statements | ${formatBadgeInline(overallCoverage.statements)} |`,
+        `| Branches | ${formatBadgeInline(overallCoverage.branches)} |`,
+        `| Functions | ${formatBadgeInline(overallCoverage.functions)} |`,
+        `| Lines | ${formatBadgeInline(overallCoverage.lines)} |`,
         '',
         meetsThreshold 
-            ? '> ✅ **Coverage check passed** — PR can be merged'
-            : `> ❌ **Coverage check failed** — Minimum ${COVERAGE_THRESHOLD}% coverage required`,
+            ? '✅ **Coverage check passed** — PR can be merged'
+            : `❌ **Coverage check failed** — Minimum ${COVERAGE_THRESHOLD}% coverage required`,
         '',
         '<details>',
         '<summary>📁 File-level Coverage Details</summary>',
@@ -370,7 +360,7 @@ function formatBadgeInline(coverage) {
         emoji = '🔴';
     }
     
-    return `<strong style="font-size: 20px;">${emoji} ${pct}%</strong>`;
+    return `${emoji} ${pct}%`;
 }
 
 
@@ -409,6 +399,17 @@ function main() {
     let existingComment = '';
     if (fs.existsSync('ui-pr-comment.md')) {
         existingComment = fs.readFileSync('ui-pr-comment.md', 'utf8');
+        
+        // Update the header to include coverage status
+        const coverageStatusText = result.meetsThreshold 
+            ? `| ✅ Coverage: ${result.overallPct}%` 
+            : `| ❌ Coverage: ${result.overallPct}% (Below ${80}%)`;
+        
+        // Replace "## ✅ All Tests Passed" or "## ❌ Tests Failed" with version that includes coverage
+        existingComment = existingComment.replace(
+            /^## (✅ All Tests Passed|❌ Tests Failed)$/m,
+            `$& ${coverageStatusText}`
+        );
     }
 
     const updatedComment = existingComment + '\n\n' + result.markdown;

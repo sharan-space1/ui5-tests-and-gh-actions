@@ -123,7 +123,7 @@ function generateMarkdownTable(projectModules, allTestResults) {
         markdown += '## ❌ Tests Failed\n\n';
     }
     // Total changed summary
-    markdown += `### 📊 Summary\n\n`;
+    markdown += `## 📊 Summary\n\n`;
     markdown += `- **Total Tests:** ${totalPassed}/${totalTests} passed`;
     if (regressions.length > 0) {
         markdown += ` • ⚠️ ${regressions.length} regression(s)`;
@@ -158,7 +158,7 @@ function generateMarkdownTable(projectModules, allTestResults) {
     // Test Results Table (only changed + failed)
     const testsToShow = allTestResults.filter(t => t.changed || t.status === 'failed');
     if (testsToShow.length > 0) {
-        markdown += '### 🧪 Test Results\n\n';
+        markdown += '## 🧪 Test Results\n\n';
         markdown += '| Project | Module | Test | Status | Type |\n';
         markdown += '|---------|--------|------|:------:|------|\n';
         testsToShow.forEach(test => {
