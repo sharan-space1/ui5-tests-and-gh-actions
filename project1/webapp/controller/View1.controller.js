@@ -142,6 +142,20 @@ sap.ui.define([
             return "Invalid";
           }
           return str1 + "+" + str2;
+        },
+
+        something2(str1, str2) {
+          if(!str1) {
+            return "Invalid";
+          }
+          return str1 + "@" + str2;
+        },
+
+        something3(str1, str2) {
+          if(!str1) {
+            return "Invalid";
+          }
+          return str1 + "#" + str2;
         }
     });
 });
