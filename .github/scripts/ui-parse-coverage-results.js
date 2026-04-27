@@ -285,18 +285,41 @@ function generateMarkdownTable(coverageResults) {
     const lines = [
         '### 📊 Code Coverage',
         '',
-        `**Overall Coverage: ${meetsThreshold ? '✅' : '❌'} ${overallCoverage.pct}%** ${meetsThreshold ? '(Threshold: ≥80% ✓)' : '(Threshold: ≥80% ✗)'}`,
+        '<table>',
+        '<tr>',
+        '<td align="center" width="120">',
+        '<div style="font-size: 48px; font-weight: bold;">',
+        meetsThreshold ? '✅' : '❌',
+        '</div>',
+        '</td>',
+        '<td>',
+        `<h3>${meetsThreshold ? '✅ Coverage Passed' : '❌ Coverage Failed'}</h3>`,
+        `<strong>Overall Coverage: ${overallCoverage.pct}%</strong><br>`,
+        `<sub>Threshold: ≥${COVERAGE_THRESHOLD}%</sub>`,
+        '</td>',
+        '</tr>',
+        '</table>',
         '',
-        '| Metric | Coverage |',
-        '|--------|----------|',
-        `| Statements | ${formatBadge(overallCoverage.statements)} |`,
-        `| Branches | ${formatBadge(overallCoverage.branches)} |`,
-        `| Functions | ${formatBadge(overallCoverage.functions)} |`,
-        `| Lines | ${formatBadge(overallCoverage.lines)} |`,
+        '#### 📈 Coverage Breakdown',
+        '',
+        '<table>',
+        '<tr>',
+        '<th width="25%">Statements</th>',
+        '<th width="25%">Branches</th>',
+        '<th width="25%">Functions</th>',
+        '<th width="25%">Lines</th>',
+        '</tr>',
+        '<tr>',
+        `<td align="center">${formatBadgeInline(overallCoverage.statements)}</td>`,
+        `<td align="center">${formatBadgeInline(overallCoverage.branches)}</td>`,
+        `<td align="center">${formatBadgeInline(overallCoverage.functions)}</td>`,
+        `<td align="center">${formatBadgeInline(overallCoverage.lines)}</td>`,
+        '</tr>',
+        '</table>',
         '',
         meetsThreshold 
-            ? '✅ **Coverage check passed** - PR can be merged'
-            : `❌ **Coverage check failed** - Minimum ${COVERAGE_THRESHOLD}% coverage required`,
+            ? '> ✅ **Coverage check passed** — PR can be merged'
+            : `> ❌ **Coverage check failed** — Minimum ${COVERAGE_THRESHOLD}% coverage required`,
         '',
         '<details>',
         '<summary>📁 File-level Coverage Details</summary>',
@@ -344,6 +367,29 @@ function formatBadge(coverage) {
         return `<nobr>🔴 ${pct}%${counts}</nobr>`;
     }
 }
+
+/**
+ * Format coverage percentage for inline display with visual bar
+ */
+function formatBadgeInline(coverage) {
+    const pct = coverage.pct;
+    const counts = `${coverage.covered}/${coverage.total}`;
+    
+    let emoji, color;
+    if (pct >= 80) {
+        emoji = '🟢';
+        color = '#28a745';
+    } else if (pct >= 50) {
+        emoji = '🟡';
+        color = '#ffc107';
+    } else {
+        emoji = '🔴';
+        color = '#dc3545';
+    }
+    
+    return `<div><strong style="font-size: 20px;">${emoji} ${pct}%</strong><br><sub>${counts}</sub></div>`;
+}
+
 
 /**
  * Main function
