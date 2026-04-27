@@ -174,7 +174,7 @@ jobs:
               const sourceFiles = JSON.parse(fs.readFileSync('ui-modules-to-test.json', 'utf8')).changedSourceFiles;
               const fileList = sourceFiles.map(f => `- \`${f.project}/${f.file}\``).join('\n');
               
-              commentBody = `# 🧪 UI5 Test Check\n\n` +
+              commentBody = `# 🧪 UI Test Check\n\n` +
                            `## ❌ Test Validation Failed\n\n` +
                            `**JavaScript source files were changed but no test files were found.**\n\n` +
                            `Please include or update at least one test file matching \`*.test.js\` or \`*Test.js\`.\n\n` +
@@ -183,7 +183,7 @@ jobs:
                            `💡 **Tip:** Create test files in \`<project>/webapp/test/unit/\` that match your source file structure.`;
             } else if (validationStatus === 'skipped') {
               // No source changes - create info comment
-              commentBody = `# 🧪 UI5 Test Check\n\n` +
+              commentBody = `# 🧪 UI Test Check\n\n` +
                            `## ℹ️ No Source Changes\n\n` +
                            `**No source files were modified in this PR.**\n\n` +
                            `Test execution was skipped as no JavaScript source code changes were detected. ` +
@@ -205,7 +205,7 @@ jobs:
             
             const botComments = comments.filter(comment => 
               comment.user.login === 'github-actions[bot]' &&
-              comment.body.includes('UI5 Test Check')
+              comment.body.includes('UI Test Check')
             );
             
             // Mark old comments as outdated
