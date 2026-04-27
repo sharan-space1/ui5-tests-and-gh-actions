@@ -220,4 +220,44 @@ sap.ui.define([
 		assert.strictEqual(oController.something4(undefined, undefined), "Invalid", "Undefined first parameter returns Invalid");
 	});
 
+	// Test for processUserData - PARTIAL COVERAGE (intentionally incomplete)
+	QUnit.test("processUserData should return error when no data provided", function (assert) {
+		var oController = new Controller();
+		var result = oController.processUserData(null);
+		assert.strictEqual(result.status, "error", "Status should be error");
+		assert.strictEqual(result.error, "No data provided", "Error message should be correct");
+	});
+
+	QUnit.test("processUserData should process valid adult user", function (assert) {
+		var oController = new Controller();
+		var userData = {
+			name: "John Doe",
+			age: 30,
+			email: "john@example.com",
+			role: "editor",
+			active: true
+		};
+		var result = oController.processUserData(userData);
+		assert.strictEqual(result.status, "success", "Status should be success");
+		assert.strictEqual(result.data.name, "John Doe", "Name should be set");
+		assert.strictEqual(result.data.age, 30, "Age should be set");
+		assert.strictEqual(result.data.category, "adult", "Category should be adult");
+		assert.strictEqual(result.data.email, "john@example.com", "Email should be set");
+		assert.deepEqual(result.data.permissions, ["read", "write"], "Editor permissions should be set");
+		assert.strictEqual(result.data.status, "active", "Status should be active");
+	});
+
+	QUnit.test("processUserData should handle viewer role", function (assert) {
+		var oController = new Controller();
+		var userData = {
+			name: "Jane",
+			age: 25,
+			email: "jane@test.com",
+			role: "viewer"
+		};
+		var result = oController.processUserData(userData);
+		assert.strictEqual(result.status, "success", "Status should be success");
+		assert.deepEqual(result.data.permissions, ["read"], "Viewer should have read permission");
+	});
+
 });
