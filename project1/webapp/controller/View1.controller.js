@@ -138,6 +138,9 @@ sap.ui.define([
         },
 
         something1(str1, str2) {
+          if(!str1) {
+            return "Invalid";
+          }
           return str1 + "+" + str2;
         }
     });
