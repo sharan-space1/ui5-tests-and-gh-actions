@@ -1,0 +1,176 @@
+name: PR Unit Tests
+
+on:
+  pull_request:
+    branches:
+      - dev
+
+jobs:
+  test-and-comment:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            */package-lock.json
+      
+      - name: Extract modules from git diff
+        id: extract
+        env:
+          GIT_BASE_REF: ${{ github.event.pull_request.base.sha }}
+          GIT_HEAD_REF: ${{ github.event.pull_request.head.sha }}
+        run: |
+          node .github/scripts/extract-modules-from-diff.js
+          
+          # Check if any modules found
+          if [ ! -f "modules-to-test.json" ]; then
+            echo "has_modules=false" >> $GITHUB_OUTPUT
+          else
+            MODULE_COUNT=$(cat modules-to-test.json | jq 'to_entries | length')
+            if [ "$MODULE_COUNT" -eq 0 ]; then
+              echo "has_modules=false" >> $GITHUB_OUTPUT
+            else
+              echo "has_modules=true" >> $GITHUB_OUTPUT
+            fi
+          fi
+      
+      - name: Run tests by module
+        if: steps.extract.outputs.has_modules == 'true'
+        env:
+          CI: true
+          GITHUB_ACTIONS: true
+        run: |
+          echo "Reading modules-to-test.json..."
+          MODULES_JSON=$(cat modules-to-test.json)
+          
+          # Loop through each project
+          echo "$MODULES_JSON" | jq -r 'keys[]' | while read project; do
+            echo "=========================================="
+            echo "Testing: $project"
+            echo "=========================================="
+            
+            # Get unique modules for this project
+            MODULES=$(echo "$MODULES_JSON" | jq -r ".\"$project\" | map(.module) | unique | join(\",\")")
+            
+            if [ -z "$MODULES" ]; then
+              echo "No modules found for $project"
+              continue
+            fi
+            
+            echo "Modules to test: $MODULES"
+            echo ""
+            
+            # Install dependencies
+            echo "Installing dependencies for $project..."
+            cd "$project"
+            npm ci
+            
+            # Set modules as environment variable for wdio.conf.js
+            export TEST_MODULES_LIST="$MODULES"
+            
+            echo ""
+            echo "Running tests for modules..."
+            echo ""
+            
+            # Run tests (wdio.conf.js will inject modules into window.TEST_MODULES)
+            npm run unit-test-headless 2>&1 | tee "../${project}-test-output.log" || true
+            
+            cd ..
+            echo ""
+          done
+          
+          echo "✓ All project tests completed"
+      
+      - name: Parse results and generate comment
+        if: steps.extract.outputs.has_modules == 'true'
+        run: |
+          node .github/scripts/parse-qunit-results.js
+      
+      - name: Parse coverage results
+        if: steps.extract.outputs.has_modules == 'true'
+        run: |
+          node .github/scripts/parse-coverage-results.js
+      
+      - name: Post PR comment
+        if: steps.extract.outputs.has_modules == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            if (!fs.existsSync('pr-comment.md')) {
+              console.log('No pr-comment.md found');
+              return;
+            }
+            
+            const commentBody = fs.readFileSync('pr-comment.md', 'utf8');
+            
+            // Find existing comments from this workflow
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number
+            });
+            
+            const botComments = comments.filter(comment => 
+              comment.user.login === 'github-actions[bot]' &&
+              comment.body.includes('Unit Test Report')
+            );
+            
+            // Mark old comments as outdated
+            for (const oldComment of botComments) {
+              console.log(`Marking comment ${oldComment.id} as outdated...`);
+              const outdatedBody = '> ⚠️ **This report is outdated.** See the latest report below.\n\n' + 
+                                   '<details>\n<summary>View outdated report</summary>\n\n' +
+                                   oldComment.body +
+                                   '\n</details>';
+              
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: oldComment.id,
+                body: outdatedBody
+              });
+            }
+            
+            // Create new comment
+            console.log('Creating new test report comment...');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: commentBody
+            });
+      
+      - name: No test changes
+        if: steps.extract.outputs.has_modules == 'false'
+        run: |
+          echo "=========================================="
+          echo "No Test Changes"
+          echo "=========================================="
+          echo ""
+          echo "ℹ️ No unit test files were modified in this PR"
+          echo ""
+      
+      - name: Upload artifacts
+        if: always() && steps.extract.outputs.has_modules == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            modules-to-test.json
+            *-test-output.log
+            pr-comment.md
+          retention-days: 30

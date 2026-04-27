@@ -21,6 +21,29 @@ server:
         port: 35729
         path: webapp
         delay: 300
+    - name: "@ui5/middleware-code-coverage"
+      afterMiddleware: compression
+      configuration:
+        report:
+          reporter: ["html", "json"]
+          "report-dir": "./tmp/coverage-reports"
+          watermarks: {
+            statements: [50, 80],
+            functions: [50, 80],
+            branches: [50, 80],
+            lines: [50, 80]
+          }
+        instrument:
+          produceSourceMap: false
+          coverageGlobalScope: "window.top"
+          coverageGlobalScopeFunc: false
+        cwd: "./"
+        excludePatterns:
+        - "resources/"
+        - "test-resources/"
+        - "test/"
+        - "dist/"
+        - "tmp/"
     - name: fiori-tools-preview
       afterMiddleware: fiori-tools-appreload
       configuration:
