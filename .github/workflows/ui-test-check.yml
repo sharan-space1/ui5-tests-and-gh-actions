@@ -1,4 +1,4 @@
-name: PR Unit Tests
+name: UI Test Check
 
 on:
   pull_request:
@@ -34,37 +34,50 @@ jobs:
         run: |
           node .github/scripts/extract-modules-from-diff.js
           
-          # Check if any modules found
+          # Check if modules-to-test.json exists
           if [ ! -f "modules-to-test.json" ]; then
-            echo "has_modules=false" >> $GITHUB_OUTPUT
-          else
-            MODULE_COUNT=$(cat modules-to-test.json | jq 'to_entries | length')
-            if [ "$MODULE_COUNT" -eq 0 ]; then
-              echo "has_modules=false" >> $GITHUB_OUTPUT
-            else
-              echo "has_modules=true" >> $GITHUB_OUTPUT
-            fi
+            echo "No changes detected"
+            echo "has_source_changes=false" >> $GITHUB_OUTPUT
+            echo "should_run_tests=false" >> $GITHUB_OUTPUT
+            exit 0
           fi
-      
-      - name: Validate test files exist
-        run: |
-          # Check if source files changed but no test files
-          if [ -f "modules-to-test.json" ]; then
-            SOURCE_COUNT=$(cat modules-to-test.json | jq '.changedSourceFiles | length')
-            TEST_PROJECTS=$(cat modules-to-test.json | jq 'to_entries | map(select(.key != "changedSourceFiles")) | length')
-            
-            echo "Source files changed: $SOURCE_COUNT"
-            echo "Test projects found: $TEST_PROJECTS"
-            
-            if [ "$SOURCE_COUNT" -gt 0 ] && [ "$TEST_PROJECTS" -eq 0 ]; then
-              echo "❌ JavaScript source files were changed but no test files were found."
-              echo "Please include or update at least one test file matching *.test.js or *Test.js."
-              exit 1
-            fi
+          
+          # Count source files and test projects
+          SOURCE_COUNT=$(cat modules-to-test.json | jq '.changedSourceFiles | length')
+          TEST_PROJECTS=$(cat modules-to-test.json | jq 'to_entries | map(select(.key != "changedSourceFiles")) | length')
+          
+          echo "📊 Change Summary:"
+          echo "  Source files changed: $SOURCE_COUNT"
+          echo "  Test projects with changes: $TEST_PROJECTS"
+          echo ""
+          
+          # Set outputs
+          echo "source_count=$SOURCE_COUNT" >> $GITHUB_OUTPUT
+          echo "test_count=$TEST_PROJECTS" >> $GITHUB_OUTPUT
+          
+          # Decision logic
+          if [ "$SOURCE_COUNT" -eq 0 ]; then
+            # No source files changed - skip tests even if test files changed
+            echo "✓ No source files changed - skipping test execution"
+            echo "has_source_changes=false" >> $GITHUB_OUTPUT
+            echo "should_run_tests=false" >> $GITHUB_OUTPUT
+          elif [ "$TEST_PROJECTS" -eq 0 ]; then
+            # Source files changed but no tests found - FAIL
+            echo "❌ ERROR: JavaScript source files were changed but no test files were found."
+            echo "Please include or update at least one test file matching *.test.js or *Test.js."
+            echo ""
+            echo "Changed source files:"
+            cat modules-to-test.json | jq -r '.changedSourceFiles[] | "  - \(.project)/\(.file)"'
+            exit 1
+          else
+            # Source files changed AND tests exist - proceed
+            echo "✓ Source files changed with corresponding tests - proceeding with test execution"
+            echo "has_source_changes=true" >> $GITHUB_OUTPUT
+            echo "should_run_tests=true" >> $GITHUB_OUTPUT
           fi
       
       - name: Run tests by module
-        if: steps.extract.outputs.has_modules == 'true'
+        if: steps.extract.outputs.should_run_tests == 'true'
         env:
           CI: true
           GITHUB_ACTIONS: true
@@ -111,7 +124,7 @@ jobs:
           echo "✓ All project tests completed"
       
       - name: Validate coverage collected
-        if: steps.extract.outputs.has_modules == 'true'
+        if: steps.extract.outputs.should_run_tests == 'true'
         run: |
           echo "Validating coverage files..."
           
@@ -133,17 +146,17 @@ jobs:
           done
       
       - name: Parse results and generate comment
-        if: steps.extract.outputs.has_modules == 'true'
+        if: steps.extract.outputs.should_run_tests == 'true'
         run: |
           node .github/scripts/parse-qunit-results.js
       
       - name: Parse coverage results
-        if: steps.extract.outputs.has_modules == 'true'
+        if: steps.extract.outputs.should_run_tests == 'true'
         run: |
           node .github/scripts/parse-coverage-results.js
       
       - name: Post PR comment
-        if: steps.extract.outputs.has_modules == 'true'
+        if: steps.extract.outputs.should_run_tests == 'true'
         uses: actions/github-script@v7
         with:
           script: |
@@ -193,18 +206,19 @@ jobs:
               body: commentBody
             });
       
-      - name: No test changes
-        if: steps.extract.outputs.has_modules == 'false'
+      - name: No source changes detected
+        if: steps.extract.outputs.should_run_tests == 'false'
         run: |
           echo "=========================================="
-          echo "No Test Changes"
+          echo "No Source File Changes"
           echo "=========================================="
           echo ""
-          echo "ℹ️ No unit test files were modified in this PR"
+          echo "ℹ️ No source files were modified in this PR"
+          echo "Test execution skipped - tests only run when source code changes"
           echo ""
       
       - name: Upload artifacts
-        if: always() && steps.extract.outputs.has_modules == 'true'
+        if: always() && steps.extract.outputs.should_run_tests == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: test-results
