@@ -228,6 +228,49 @@ function calculateDiffCoverage(fileCoverage, changedRanges) {
 }
 
 /**
+ * Calculate overall coverage percentage
+ */
+function calculateOverallCoverage(coverageResults) {
+    if (!coverageResults || coverageResults.length === 0) {
+        return { pct: 0, covered: 0, total: 0 };
+    }
+
+    // Aggregate all metrics
+    let totalStatements = 0, coveredStatements = 0;
+    let totalBranches = 0, coveredBranches = 0;
+    let totalFunctions = 0, coveredFunctions = 0;
+    let totalLines = 0, coveredLines = 0;
+
+    coverageResults.forEach(result => {
+        totalStatements += result.statements.total;
+        coveredStatements += result.statements.covered;
+        totalBranches += result.branches.total;
+        coveredBranches += result.branches.covered;
+        totalFunctions += result.functions.total;
+        coveredFunctions += result.functions.covered;
+        totalLines += result.lines.total;
+        coveredLines += result.lines.covered;
+    });
+
+    // Calculate average percentage across all four metrics
+    const stmtPct = totalStatements > 0 ? (coveredStatements / totalStatements) * 100 : 0;
+    const branchPct = totalBranches > 0 ? (coveredBranches / totalBranches) * 100 : 0;
+    const fnPct = totalFunctions > 0 ? (coveredFunctions / totalFunctions) * 100 : 0;
+    const linePct = totalLines > 0 ? (coveredLines / totalLines) * 100 : 0;
+
+    // Average of all four metrics
+    const overallPct = Math.round(((stmtPct + branchPct + fnPct + linePct) / 4) * 100) / 100;
+
+    return {
+        pct: overallPct,
+        statements: { pct: Math.round(stmtPct * 100) / 100, covered: coveredStatements, total: totalStatements },
+        branches: { pct: Math.round(branchPct * 100) / 100, covered: coveredBranches, total: totalBranches },
+        functions: { pct: Math.round(fnPct * 100) / 100, covered: coveredFunctions, total: totalFunctions },
+        lines: { pct: Math.round(linePct * 100) / 100, covered: coveredLines, total: totalLines }
+    };
+}
+
+/**
  * Generate markdown table
  */
 function generateMarkdownTable(coverageResults) {
@@ -235,8 +278,28 @@ function generateMarkdownTable(coverageResults) {
         return null;
     }
 
+    const COVERAGE_THRESHOLD = 80;
+    const overallCoverage = calculateOverallCoverage(coverageResults);
+    const meetsThreshold = overallCoverage.pct >= COVERAGE_THRESHOLD;
+
     const lines = [
         '### 📊 Code Coverage',
+        '',
+        `**Overall Coverage: ${meetsThreshold ? '✅' : '❌'} ${overallCoverage.pct}%** ${meetsThreshold ? '(Threshold: ≥80% ✓)' : '(Threshold: ≥80% ✗)'}`,
+        '',
+        '| Metric | Coverage |',
+        '|--------|----------|',
+        `| Statements | ${formatBadge(overallCoverage.statements)} |`,
+        `| Branches | ${formatBadge(overallCoverage.branches)} |`,
+        `| Functions | ${formatBadge(overallCoverage.functions)} |`,
+        `| Lines | ${formatBadge(overallCoverage.lines)} |`,
+        '',
+        meetsThreshold 
+            ? '✅ **Coverage check passed** - PR can be merged'
+            : `❌ **Coverage check failed** - Minimum ${COVERAGE_THRESHOLD}% coverage required`,
+        '',
+        '<details>',
+        '<summary>📁 File-level Coverage Details</summary>',
         '',
         '| Project | File | Statements | Branches | Functions | Lines |',
         '|---------|------|------------|----------|-----------|-------|'
@@ -258,10 +321,12 @@ function generateMarkdownTable(coverageResults) {
     });
 
     lines.push('');
+    lines.push('</details>');
+    lines.push('');
     lines.push('_Coverage for changed lines only (diff coverage) - Statements / Branches / Functions / Lines_');
     lines.push('');
 
-    return lines.join('\n');
+    return { markdown: lines.join('\n'), meetsThreshold, overallPct: overallCoverage.pct };
 }
 
 /**
@@ -305,9 +370,9 @@ function main() {
         return;
     }
 
-    const markdownTable = generateMarkdownTable(coverageResults);
+    const result = generateMarkdownTable(coverageResults);
 
-    if (!markdownTable) {
+    if (!result) {
         return;
     }
 
@@ -315,11 +380,21 @@ function main() {
     let existingComment = '';
     if (fs.existsSync('ui-pr-comment.md')) {
         existingComment = fs.readFileSync('ui-pr-comment.md', 'utf8');
-    } else {
     }
 
-    const updatedComment = existingComment + '\n\n' + markdownTable;
+    const updatedComment = existingComment + '\n\n' + result.markdown;
     fs.writeFileSync('ui-pr-comment.md', updatedComment);
+
+    // Log result
+    console.log(`\n${result.meetsThreshold ? '✅' : '❌'} Overall coverage: ${result.overallPct}% (threshold: ≥80%)`);
+
+    // Exit with error code if threshold not met
+    if (!result.meetsThreshold) {
+        console.log('❌ Coverage check failed - PR cannot be merged\n');
+        process.exit(1);
+    } else {
+        console.log('✅ Coverage check passed - PR can be merged\n');
+    }
 
 }
 

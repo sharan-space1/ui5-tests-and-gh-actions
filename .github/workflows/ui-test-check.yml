@@ -155,9 +155,30 @@ jobs:
           node .github/scripts/ui-parse-qunit-results.js
       
       - name: Parse coverage results
+        id: coverage
         if: steps.extract.outputs.should_run_tests == 'true'
+        continue-on-error: true
         run: |
           node .github/scripts/ui-parse-coverage-results.js
+      
+      - name: Check for coverage bypass label
+        id: check_bypass
+        if: steps.extract.outputs.should_run_tests == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number
+            });
+            
+            const hasBypassLabel = labels.some(label => label.name === 'skip-coverage-check');
+            core.setOutput('bypass_coverage', hasBypassLabel);
+            
+            if (hasBypassLabel) {
+              console.log('⚠️ Coverage check bypass label detected');
+            }
       
       - name: Post PR comment
         if: always() && steps.extract.outputs.validation_status != ''
@@ -191,6 +212,21 @@ jobs:
             } else if (fs.existsSync('ui-pr-comment.md')) {
               // Tests ran successfully
               commentBody = fs.readFileSync('ui-pr-comment.md', 'utf8');
+              
+              // Add bypass warning if label exists and coverage failed
+              const bypassCoverage = '${{ steps.check_bypass.outputs.bypass_coverage }}' === 'true';
+              const coverageFailed = '${{ steps.coverage.outcome }}' === 'failure';
+              
+              if (bypassCoverage && coverageFailed) {
+                commentBody = commentBody.replace(
+                  '### 📊 Code Coverage',
+                  '### 📊 Code Coverage\n\n' +
+                  '> ⚠️ **Coverage Check Bypassed**\n' +
+                  '> \n' +
+                  '> The `skip-coverage-check` label is applied to this PR.\n' +
+                  '> Coverage is below the 80% threshold but the check will not block the merge.\n\n'
+                );
+              }
             } else {
               return;
             }
@@ -235,3 +271,15 @@ jobs:
         run: |
           echo "❌ Validation failed: Tests are mandatory for source code changes"
           exit 1
+      
+      - name: Fail if coverage below threshold
+        if: steps.coverage.outcome == 'failure' && steps.check_bypass.outputs.bypass_coverage != 'true'
+        run: |
+          echo "❌ Coverage check failed: Coverage is below 80% threshold"
+          exit 1
+      
+      - name: Log coverage bypass
+        if: steps.coverage.outcome == 'failure' && steps.check_bypass.outputs.bypass_coverage == 'true'
+        run: |
+          echo "⚠️ Coverage check bypassed: 'skip-coverage-check' label detected"
+          echo "⚠️ PR can be merged despite coverage below 80% threshold"
