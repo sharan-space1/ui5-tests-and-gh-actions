@@ -46,6 +46,23 @@ jobs:
             fi
           fi
       
+      - name: Validate test files exist
+        run: |
+          # Check if source files changed but no test files
+          if [ -f "modules-to-test.json" ]; then
+            SOURCE_COUNT=$(cat modules-to-test.json | jq '.changedSourceFiles | length')
+            TEST_PROJECTS=$(cat modules-to-test.json | jq 'to_entries | map(select(.key != "changedSourceFiles")) | length')
+            
+            echo "Source files changed: $SOURCE_COUNT"
+            echo "Test projects found: $TEST_PROJECTS"
+            
+            if [ "$SOURCE_COUNT" -gt 0 ] && [ "$TEST_PROJECTS" -eq 0 ]; then
+              echo "❌ JavaScript source files were changed but no test files were found."
+              echo "Please include or update at least one test file matching *.test.js or *Test.js."
+              exit 1
+            fi
+          fi
+      
       - name: Run tests by module
         if: steps.extract.outputs.has_modules == 'true'
         env:
