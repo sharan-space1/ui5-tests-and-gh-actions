@@ -70,7 +70,7 @@ exports.config = {
         console.log('[wdio.conf.js] ======================================');
         
         // Inject TEST_MODULES from environment variable into browser context
-        const modulesString = process.env.TEST_MODULES_LIST || "App Controller";
+        const modulesString = process.env.TEST_MODULES_LIST;
         console.log('[wdio.conf.js] process.env.TEST_MODULES_LIST:', modulesString);
         
         if (modulesString) {
