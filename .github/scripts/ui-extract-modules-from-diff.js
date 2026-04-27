@@ -234,8 +234,8 @@ function main() {
     
     if (changedFiles.length === 0 && changedSourceFiles.length === 0) {
         console.log('[extract-modules] No test or source files changed.');
-        fs.writeFileSync('modules-to-test.json', JSON.stringify({ changedSourceFiles: [] }, null, 2));
-        console.log('[extract-modules] ✓ Created empty modules-to-test.json');
+        fs.writeFileSync('ui-modules-to-test.json', JSON.stringify({ changedSourceFiles: [] }, null, 2));
+        console.log('[extract-modules] ✓ Created empty ui-modules-to-test.json');
         process.exit(0);
     }
     
@@ -284,9 +284,9 @@ function main() {
     const outputJson = JSON.stringify(projectModules, null, 2);
     console.log('[extract-modules] Output JSON:');
     console.log(outputJson);
-    fs.writeFileSync('modules-to-test.json', outputJson);
+    fs.writeFileSync('ui-modules-to-test.json', outputJson);
     
-    console.log('[extract-modules] ✓ Created modules-to-test.json');
+    console.log('[extract-modules] ✓ Created ui-modules-to-test.json');
     console.log(`[extract-modules] ✓ Projects with changes: ${Object.keys(projectModules).filter(k => k !== 'changedSourceFiles').join(', ')}`);
     console.log(`[extract-modules] ✓ Changed source files: ${changedSourceFiles.length}`);
     console.log('[extract-modules] ========================================');
