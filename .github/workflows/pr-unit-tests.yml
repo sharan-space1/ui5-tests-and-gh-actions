@@ -110,6 +110,28 @@ jobs:
           
           echo "✓ All project tests completed"
       
+      - name: Validate coverage collected
+        if: steps.extract.outputs.has_modules == 'true'
+        run: |
+          echo "Validating coverage files..."
+          
+          MODULES_JSON=$(cat modules-to-test.json)
+          echo "$MODULES_JSON" | jq -r 'keys[] | select(. != "changedSourceFiles")' | while read project; do
+            COVERAGE_FILE="${project}/tmp/coverage-reports/json/coverage-final.json"
+            
+            if [ -f "$COVERAGE_FILE" ]; then
+              echo "✓ Coverage file found for $project"
+              # Validate it's valid JSON
+              if jq empty "$COVERAGE_FILE" 2>/dev/null; then
+                echo "✓ Coverage file is valid JSON"
+              else
+                echo "⚠ Warning: Coverage file exists but is not valid JSON"
+              fi
+            else
+              echo "⚠ Warning: No coverage file found for $project at $COVERAGE_FILE"
+            fi
+          done
+      
       - name: Parse results and generate comment
         if: steps.extract.outputs.has_modules == 'true'
         run: |
