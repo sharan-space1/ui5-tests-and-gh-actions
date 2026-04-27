@@ -285,20 +285,7 @@ function generateMarkdownTable(coverageResults) {
     const lines = [
         '### 📊 Code Coverage',
         '',
-        '<table>',
-        '<tr>',
-        '<td align="center" width="120">',
-        '<div style="font-size: 48px; font-weight: bold;">',
-        meetsThreshold ? '✅' : '❌',
-        '</div>',
-        '</td>',
-        '<td>',
-        `<h3>${meetsThreshold ? '✅ Coverage Passed' : '❌ Coverage Failed'}</h3>`,
-        `<strong>Overall Coverage: ${overallCoverage.pct}%</strong><br>`,
-        `<sub>Threshold: ≥${COVERAGE_THRESHOLD}%</sub>`,
-        '</td>',
-        '</tr>',
-        '</table>',
+        `**${meetsThreshold ? '✅' : '❌'} Overall Coverage: ${overallCoverage.pct}%** (Threshold: ≥${COVERAGE_THRESHOLD}%)`,
         '',
         '#### 📈 Coverage Breakdown',
         '',
@@ -373,21 +360,17 @@ function formatBadge(coverage) {
  */
 function formatBadgeInline(coverage) {
     const pct = coverage.pct;
-    const counts = `${coverage.covered}/${coverage.total}`;
     
-    let emoji, color;
+    let emoji;
     if (pct >= 80) {
         emoji = '🟢';
-        color = '#28a745';
     } else if (pct >= 50) {
         emoji = '🟡';
-        color = '#ffc107';
     } else {
         emoji = '🔴';
-        color = '#dc3545';
     }
     
-    return `<div><strong style="font-size: 20px;">${emoji} ${pct}%</strong><br><sub>${counts}</sub></div>`;
+    return `<strong style="font-size: 20px;">${emoji} ${pct}%</strong>`;
 }
 
 
