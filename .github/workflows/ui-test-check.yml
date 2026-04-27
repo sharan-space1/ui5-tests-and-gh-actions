@@ -192,7 +192,6 @@ jobs:
               // Tests ran successfully
               commentBody = fs.readFileSync('ui-pr-comment.md', 'utf8');
             } else {
-              console.log('No comment to post');
               return;
             }
             
@@ -210,7 +209,6 @@ jobs:
             
             // Mark old comments as outdated
             for (const oldComment of botComments) {
-              console.log(`Marking comment ${oldComment.id} as outdated...`);
               const outdatedBody = '> ⚠️ **This report is outdated.** See the latest report below.\n\n' + 
                                    '<details>\n<summary>View outdated report</summary>\n\n' +
                                    oldComment.body +
@@ -225,7 +223,6 @@ jobs:
             }
             
             // Create new comment
-            console.log('Creating new test report comment...');
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -238,14 +235,3 @@ jobs:
         run: |
           echo "❌ Validation failed: Tests are mandatory for source code changes"
           exit 1
-      
-      - name: Upload artifacts
-        if: always() && steps.extract.outputs.should_run_tests == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: |
-            ui-modules-to-test.json
-            *-ui-test-output.log
-            ui-pr-comment.md
-          retention-days: 30

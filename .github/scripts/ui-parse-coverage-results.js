@@ -5,18 +5,13 @@ const path = require('path');
  * Parse coverage data and filter by changed files
  */
 function parseCoverageResults() {
-    console.log('[parse-coverage] ========================================');
-    console.log('[parse-coverage] Starting coverage result parsing...');
-    console.log('[parse-coverage] ========================================\n');
-
+    console.log('Parsing coverage results...');
+    
     const modulesData = JSON.parse(fs.readFileSync('ui-modules-to-test.json', 'utf8'));
     const changedSourceFiles = modulesData.changedSourceFiles || [];
 
-    console.log(`[parse-coverage] Changed source files: ${changedSourceFiles.length}`);
     changedSourceFiles.forEach(f => {
-        console.log(`[parse-coverage]   - ${f.project}: ${f.file}${f.changedRanges && f.changedRanges.length > 0 ? ` (${f.changedRanges.length} ranges)` : ''}`);
     });
-    console.log('');
 
     const coverageResults = [];
 
@@ -33,16 +28,12 @@ function parseCoverageResults() {
     Object.keys(filesByProject).forEach(project => {
         const coverageFile = path.join(project, 'tmp', 'coverage-reports', 'json', 'coverage-final.json');
         
-        console.log(`[parse-coverage] Processing ${project}...`);
-        console.log(`[parse-coverage] Looking for: ${coverageFile}`);
 
         if (!fs.existsSync(coverageFile)) {
-            console.log(`[parse-coverage] ⚠ No coverage file found for ${project}`);
             return;
         }
 
         const coverageData = JSON.parse(fs.readFileSync(coverageFile, 'utf8'));
-        console.log(`[parse-coverage] ✓ Coverage file loaded for ${project}`);
 
         // Filter coverage data for changed files
         filesByProject[project].forEach(sourceFile => {
@@ -55,7 +46,6 @@ function parseCoverageResults() {
             });
 
             if (matchingKeys.length === 0) {
-                console.log(`[parse-coverage]   ⚠ No coverage data for ${file}`);
                 coverageResults.push({
                     project,
                     file,
@@ -83,7 +73,8 @@ function parseCoverageResults() {
             const rangeInfo = sourceFile.changedRanges && sourceFile.changedRanges.length > 0 
                 ? ` [diff coverage]` 
                 : ` [full file]`;
-            console.log(`[parse-coverage]   ✓ ${file}${rangeInfo}: S:${statements.pct}% B:${branches.pct}% F:${functions.pct}% L:${lines.pct}%`);
+            
+            console.log(`  ${file}${rangeInfo} - S:${statements.pct}% B:${branches.pct}% F:${functions.pct}% L:${lines.pct}%`);
 
             coverageResults.push({
                 project,
@@ -95,7 +86,6 @@ function parseCoverageResults() {
             });
         });
 
-        console.log('');
     });
 
     return coverageResults;
@@ -296,7 +286,6 @@ function formatBadge(coverage) {
 function main() {
     // Check if ui-modules-to-test.json exists
     if (!fs.existsSync('ui-modules-to-test.json')) {
-        console.log('[parse-coverage] No ui-modules-to-test.json found - skipping coverage report');
         addSkipMessage('No test changes detected');
         return;
     }
@@ -305,7 +294,6 @@ function main() {
     const changedSourceFiles = modulesData.changedSourceFiles || [];
 
     if (changedSourceFiles.length === 0) {
-        console.log('[parse-coverage] No changed source files - skipping coverage report');
         addSkipMessage('No source files changed (only test files modified)');
         return;
     }
@@ -313,7 +301,6 @@ function main() {
     const coverageResults = parseCoverageResults();
 
     if (!coverageResults || coverageResults.length === 0) {
-        console.log('[parse-coverage] No coverage results to report');
         addSkipMessage('Coverage data not available');
         return;
     }
@@ -321,7 +308,6 @@ function main() {
     const markdownTable = generateMarkdownTable(coverageResults);
 
     if (!markdownTable) {
-        console.log('[parse-coverage] Failed to generate markdown table');
         return;
     }
 
@@ -329,17 +315,12 @@ function main() {
     let existingComment = '';
     if (fs.existsSync('ui-pr-comment.md')) {
         existingComment = fs.readFileSync('ui-pr-comment.md', 'utf8');
-        console.log('[parse-coverage] ✓ Appending to existing ui-pr-comment.md');
     } else {
-        console.log('[parse-coverage] ✓ Creating new ui-pr-comment.md');
     }
 
     const updatedComment = existingComment + '\n\n' + markdownTable;
     fs.writeFileSync('ui-pr-comment.md', updatedComment);
 
-    console.log('[parse-coverage] ========================================');
-    console.log('[parse-coverage] ✓ Coverage report added to ui-pr-comment.md');
-    console.log('[parse-coverage] ========================================');
 }
 
 /**
@@ -361,7 +342,6 @@ function addSkipMessage(reason) {
     const updatedComment = existingComment + '\n\n' + skipMessage;
     fs.writeFileSync('ui-pr-comment.md', updatedComment);
 
-    console.log('[parse-coverage] ✓ Skip message added to ui-pr-comment.md');
 }
 
 main();
