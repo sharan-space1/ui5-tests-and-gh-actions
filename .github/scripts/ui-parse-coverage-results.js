@@ -400,15 +400,15 @@ function main() {
     if (fs.existsSync('ui-pr-comment.md')) {
         existingComment = fs.readFileSync('ui-pr-comment.md', 'utf8');
         
-        // Update the header to include coverage status
+        // Update the status blockquote to include coverage
         const coverageStatusText = result.meetsThreshold 
-            ? `| ✅ Coverage: ${result.overallPct}%` 
-            : `| ❌ Coverage: ${result.overallPct}% (Below ${80}%)`;
+            ? ` | ✅ Coverage: ${result.overallPct}%` 
+            : ` | ❌ Coverage: ${result.overallPct}%`;
         
-        // Replace "## ✅ All Tests Passed" or "## ❌ Tests Failed" with version that includes coverage
+        // Replace "> **✅ All Tests Passed**" or "> **❌ Tests Failed**" with version that includes coverage
         existingComment = existingComment.replace(
-            /^## (✅ All Tests Passed|❌ Tests Failed)$/m,
-            `$& ${coverageStatusText}`
+            /^> \*\*(✅ All Tests Passed|❌ Tests Failed)\*\*$/m,
+            `> **$1${coverageStatusText}**`
         );
     }
 

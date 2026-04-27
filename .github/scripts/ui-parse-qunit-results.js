@@ -118,9 +118,9 @@ function generateMarkdownTable(projectModules, allTestResults) {
     const totalFailed = allTestResults.filter(t => t.status === 'failed').length;
     // Summary status
     if (changedFailed === 0 && regressions.length === 0) {
-        markdown += '## ✅ All Tests Passed\n\n';
+        markdown += '> **✅ All Tests Passed**\n\n';
     } else {
-        markdown += '## ❌ Tests Failed\n\n';
+        markdown += '> **❌ Tests Failed**\n\n';
     }
     // Total changed summary
     markdown += `## 📊 Summary\n\n`;
