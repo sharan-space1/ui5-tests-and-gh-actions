@@ -131,7 +131,7 @@ function parseQUnitResults(logContent, moduleName) {
  * Generate markdown table for PR comment
  */
 function generateMarkdownTable(projectModules, allTestResults) {
-    let markdown = '# 🧪 Unit Test Report\n\n';
+    let markdown = '# 🧪 UI5 Test Check\n\n';
     
     // Calculate summary statistics
     const totalChanged = Object.entries(projectModules)
