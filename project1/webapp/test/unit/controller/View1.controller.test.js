@@ -217,6 +217,7 @@ sap.ui.define([
 		assert.strictEqual(oController.something4("", "second"), "Invalid", "Empty string returns Invalid");
 		assert.strictEqual(oController.something4(null, "second"), "Invalid", "Null first parameter returns Invalid");
 		assert.strictEqual(oController.something4(undefined, "second"), "Invalid", "Undefined first parameter returns Invalid");
+		assert.strictEqual(oController.something4(undefined, undefined), "Invalid", "Undefined first parameter returns Invalid");
 	});
 
 });
