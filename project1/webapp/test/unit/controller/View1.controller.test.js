@@ -175,4 +175,11 @@ sap.ui.define([
 		assert.strictEqual(oController.countWords("   "), 0, "Whitespace only has 0 words");
 	});
 
+	QUnit.test("something1 should concatenate strings with plus sign", function (assert) {
+		var oController = new Controller();
+		assert.strictEqual(oController.something1("hello", "world"), "hello+world", "Two strings concatenated with +");
+		assert.strictEqual(oController.something1("test", "123"), "test+123", "String and number concatenated");
+		assert.strictEqual(oController.something1("a", "b"), "a+b", "Single characters concatenated");
+	});
+
 });
