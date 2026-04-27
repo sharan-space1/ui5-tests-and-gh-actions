@@ -61,6 +61,7 @@ jobs:
             echo "✓ No source files changed - skipping test execution"
             echo "has_source_changes=false" >> $GITHUB_OUTPUT
             echo "should_run_tests=false" >> $GITHUB_OUTPUT
+            echo "validation_status=skipped" >> $GITHUB_OUTPUT
           elif [ "$TEST_PROJECTS" -eq 0 ]; then
             # Source files changed but no tests found - FAIL
             echo "❌ ERROR: JavaScript source files were changed but no test files were found."
@@ -68,12 +69,15 @@ jobs:
             echo ""
             echo "Changed source files:"
             cat ui-modules-to-test.json | jq -r '.changedSourceFiles[] | "  - \(.project)/\(.file)"'
-            exit 1
+            echo "has_source_changes=true" >> $GITHUB_OUTPUT
+            echo "should_run_tests=false" >> $GITHUB_OUTPUT
+            echo "validation_status=failed" >> $GITHUB_OUTPUT
           else
             # Source files changed AND tests exist - proceed
             echo "✓ Source files changed with corresponding tests - proceeding with test execution"
             echo "has_source_changes=true" >> $GITHUB_OUTPUT
             echo "should_run_tests=true" >> $GITHUB_OUTPUT
+            echo "validation_status=passed" >> $GITHUB_OUTPUT
           fi
       
       - name: Run tests by module
@@ -151,23 +155,81 @@ jobs:
           node .github/scripts/ui-parse-qunit-results.js
       
       - name: Parse coverage results
+        id: coverage
         if: steps.extract.outputs.should_run_tests == 'true'
+        continue-on-error: true
         run: |
           node .github/scripts/ui-parse-coverage-results.js
       
-      - name: Post PR comment
+      - name: Check for coverage bypass label
+        id: check_bypass
         if: steps.extract.outputs.should_run_tests == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number
+            });
+            
+            const hasBypassLabel = labels.some(label => label.name === 'skip-coverage-check');
+            core.setOutput('bypass_coverage', hasBypassLabel);
+            
+            if (hasBypassLabel) {
+              console.log('⚠️ Coverage check bypass label detected');
+            }
+      
+      - name: Post PR comment
+        if: always() && steps.extract.outputs.validation_status != ''
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
             
-            if (!fs.existsSync('ui-pr-comment.md')) {
-              console.log('No ui-pr-comment.md found');
+            let commentBody = '';
+            const validationStatus = '${{ steps.extract.outputs.validation_status }}';
+            
+            if (validationStatus === 'failed') {
+              // Validation failed - create error comment
+              const sourceFiles = JSON.parse(fs.readFileSync('ui-modules-to-test.json', 'utf8')).changedSourceFiles;
+              const fileList = sourceFiles.map(f => `- \`${f.project}/${f.file}\``).join('\n');
+              
+              commentBody = `# 🧪 UI Test Check\n\n` +
+                           `## ❌ Test Validation Failed\n\n` +
+                           `**JavaScript source files were changed but no test files were found.**\n\n` +
+                           `Please include or update at least one test file matching \`*.test.js\` or \`*Test.js\`.\n\n` +
+                           `### Changed Source Files:\n${fileList}\n\n` +
+                           `---\n\n` +
+                           `💡 **Tip:** Create test files in \`<project>/webapp/test/unit/\` that match your source file structure.`;
+            } else if (validationStatus === 'skipped') {
+              // No source changes - create info comment
+              commentBody = `# 🧪 UI Test Check\n\n` +
+                           `## ℹ️ No Source Changes\n\n` +
+                           `**No source files were modified in this PR.**\n\n` +
+                           `Test execution was skipped as no JavaScript source code changes were detected. ` +
+                           `Tests only run when source files in \`webapp/controller/\`, \`webapp/model/\`, or \`Component.js\` are modified.`;
+            } else if (fs.existsSync('ui-pr-comment.md')) {
+              // Tests ran successfully
+              commentBody = fs.readFileSync('ui-pr-comment.md', 'utf8');
+              
+              // Add bypass warning if label exists and coverage failed
+              const bypassCoverage = '${{ steps.check_bypass.outputs.bypass_coverage }}' === 'true';
+              const coverageFailed = '${{ steps.coverage.outcome }}' === 'failure';
+              
+              if (bypassCoverage && coverageFailed) {
+                commentBody = commentBody.replace(
+                  '### 📊 Code Coverage',
+                  '### 📊 Code Coverage\n\n' +
+                  '> ⚠️ **Coverage Check Bypassed**\n' +
+                  '> \n' +
+                  '> The `skip-coverage-check` label is applied to this PR.\n' +
+                  '> Coverage is below the 80% threshold but the check will not block the merge.\n\n'
+                );
+              }
+            } else {
               return;
             }
-            
-            const commentBody = fs.readFileSync('ui-pr-comment.md', 'utf8');
             
             // Find existing comments from this workflow
             const { data: comments } = await github.rest.issues.listComments({
@@ -178,12 +240,11 @@ jobs:
             
             const botComments = comments.filter(comment => 
               comment.user.login === 'github-actions[bot]' &&
-              comment.body.includes('Unit Test Report')
+              comment.body.includes('UI Test Check')
             );
             
             // Mark old comments as outdated
             for (const oldComment of botComments) {
-              console.log(`Marking comment ${oldComment.id} as outdated...`);
               const outdatedBody = '> ⚠️ **This report is outdated.** See the latest report below.\n\n' + 
                                    '<details>\n<summary>View outdated report</summary>\n\n' +
                                    oldComment.body +
@@ -198,7 +259,6 @@ jobs:
             }
             
             // Create new comment
-            console.log('Creating new test report comment...');
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -206,24 +266,20 @@ jobs:
               body: commentBody
             });
       
-      - name: No source changes detected
-        if: steps.extract.outputs.should_run_tests == 'false'
+      - name: Fail if validation failed
+        if: steps.extract.outputs.validation_status == 'failed'
         run: |
-          echo "=========================================="
-          echo "No Source File Changes"
-          echo "=========================================="
-          echo ""
-          echo "ℹ️ No source files were modified in this PR"
-          echo "Test execution skipped - tests only run when source code changes"
-          echo ""
+          echo "❌ Validation failed: Tests are mandatory for source code changes"
+          exit 1
       
-      - name: Upload artifacts
-        if: always() && steps.extract.outputs.should_run_tests == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: |
-            ui-modules-to-test.json
-            *-ui-test-output.log
-            ui-pr-comment.md
-          retention-days: 30
+      - name: Fail if coverage below threshold
+        if: steps.coverage.outcome == 'failure' && steps.check_bypass.outputs.bypass_coverage != 'true'
+        run: |
+          echo "❌ Coverage check failed: Coverage is below 80% threshold"
+          exit 1
+      
+      - name: Log coverage bypass
+        if: steps.coverage.outcome == 'failure' && steps.check_bypass.outputs.bypass_coverage == 'true'
+        run: |
+          echo "⚠️ Coverage check bypassed: 'skip-coverage-check' label detected"
+          echo "⚠️ PR can be merged despite coverage below 80% threshold"

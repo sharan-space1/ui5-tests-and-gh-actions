@@ -208,4 +208,16 @@ sap.ui.define([
 		assert.strictEqual(oController.something3(undefined, "second"), "Invalid", "Undefined first parameter returns Invalid");
 	});
 
+	QUnit.test("something1 should concatenate strings with & sign", function (assert) {
+		var oController = new Controller();
+		assert.strictEqual(oController.something4("hello", "world"), "hello&world", "Two strings concatenated with +");
+		assert.strictEqual(oController.something4("test", "123"), "test&123", "String and number concatenated");
+		assert.strictEqual(oController.something4("a", "b"), "a&b", "Single characters concatenated");
+		assert.strictEqual(oController.something4("first", undefined), "first&undefined", "Second parameter undefined");
+		assert.strictEqual(oController.something4("", "second"), "Invalid", "Empty string returns Invalid");
+		assert.strictEqual(oController.something4(null, "second"), "Invalid", "Null first parameter returns Invalid");
+		assert.strictEqual(oController.something4(undefined, "second"), "Invalid", "Undefined first parameter returns Invalid");
+		assert.strictEqual(oController.something4(undefined, undefined), "Invalid", "Undefined first parameter returns Invalid");
+	});
+
 });

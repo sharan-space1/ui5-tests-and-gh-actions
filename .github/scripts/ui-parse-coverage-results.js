@@ -5,18 +5,13 @@ const path = require('path');
  * Parse coverage data and filter by changed files
  */
 function parseCoverageResults() {
-    console.log('[parse-coverage] ========================================');
-    console.log('[parse-coverage] Starting coverage result parsing...');
-    console.log('[parse-coverage] ========================================\n');
-
+    console.log('Parsing coverage results...');
+    
     const modulesData = JSON.parse(fs.readFileSync('ui-modules-to-test.json', 'utf8'));
     const changedSourceFiles = modulesData.changedSourceFiles || [];
 
-    console.log(`[parse-coverage] Changed source files: ${changedSourceFiles.length}`);
     changedSourceFiles.forEach(f => {
-        console.log(`[parse-coverage]   - ${f.project}: ${f.file}${f.changedRanges && f.changedRanges.length > 0 ? ` (${f.changedRanges.length} ranges)` : ''}`);
     });
-    console.log('');
 
     const coverageResults = [];
 
@@ -33,16 +28,12 @@ function parseCoverageResults() {
     Object.keys(filesByProject).forEach(project => {
         const coverageFile = path.join(project, 'tmp', 'coverage-reports', 'json', 'coverage-final.json');
         
-        console.log(`[parse-coverage] Processing ${project}...`);
-        console.log(`[parse-coverage] Looking for: ${coverageFile}`);
 
         if (!fs.existsSync(coverageFile)) {
-            console.log(`[parse-coverage] ⚠ No coverage file found for ${project}`);
             return;
         }
 
         const coverageData = JSON.parse(fs.readFileSync(coverageFile, 'utf8'));
-        console.log(`[parse-coverage] ✓ Coverage file loaded for ${project}`);
 
         // Filter coverage data for changed files
         filesByProject[project].forEach(sourceFile => {
@@ -55,7 +46,6 @@ function parseCoverageResults() {
             });
 
             if (matchingKeys.length === 0) {
-                console.log(`[parse-coverage]   ⚠ No coverage data for ${file}`);
                 coverageResults.push({
                     project,
                     file,
@@ -83,7 +73,8 @@ function parseCoverageResults() {
             const rangeInfo = sourceFile.changedRanges && sourceFile.changedRanges.length > 0 
                 ? ` [diff coverage]` 
                 : ` [full file]`;
-            console.log(`[parse-coverage]   ✓ ${file}${rangeInfo}: S:${statements.pct}% B:${branches.pct}% F:${functions.pct}% L:${lines.pct}%`);
+            
+            console.log(`  ${file}${rangeInfo} - S:${statements.pct}% B:${branches.pct}% F:${functions.pct}% L:${lines.pct}%`);
 
             coverageResults.push({
                 project,
@@ -95,7 +86,6 @@ function parseCoverageResults() {
             });
         });
 
-        console.log('');
     });
 
     return coverageResults;
@@ -238,6 +228,49 @@ function calculateDiffCoverage(fileCoverage, changedRanges) {
 }
 
 /**
+ * Calculate overall coverage percentage
+ */
+function calculateOverallCoverage(coverageResults) {
+    if (!coverageResults || coverageResults.length === 0) {
+        return { pct: 0, covered: 0, total: 0 };
+    }
+
+    // Aggregate all metrics
+    let totalStatements = 0, coveredStatements = 0;
+    let totalBranches = 0, coveredBranches = 0;
+    let totalFunctions = 0, coveredFunctions = 0;
+    let totalLines = 0, coveredLines = 0;
+
+    coverageResults.forEach(result => {
+        totalStatements += result.statements.total;
+        coveredStatements += result.statements.covered;
+        totalBranches += result.branches.total;
+        coveredBranches += result.branches.covered;
+        totalFunctions += result.functions.total;
+        coveredFunctions += result.functions.covered;
+        totalLines += result.lines.total;
+        coveredLines += result.lines.covered;
+    });
+
+    // Calculate average percentage across all four metrics
+    const stmtPct = totalStatements > 0 ? (coveredStatements / totalStatements) * 100 : 0;
+    const branchPct = totalBranches > 0 ? (coveredBranches / totalBranches) * 100 : 0;
+    const fnPct = totalFunctions > 0 ? (coveredFunctions / totalFunctions) * 100 : 0;
+    const linePct = totalLines > 0 ? (coveredLines / totalLines) * 100 : 0;
+
+    // Average of all four metrics
+    const overallPct = Math.round(((stmtPct + branchPct + fnPct + linePct) / 4) * 100) / 100;
+
+    return {
+        pct: overallPct,
+        statements: { pct: Math.round(stmtPct * 100) / 100, covered: coveredStatements, total: totalStatements },
+        branches: { pct: Math.round(branchPct * 100) / 100, covered: coveredBranches, total: totalBranches },
+        functions: { pct: Math.round(fnPct * 100) / 100, covered: coveredFunctions, total: totalFunctions },
+        lines: { pct: Math.round(linePct * 100) / 100, covered: coveredLines, total: totalLines }
+    };
+}
+
+/**
  * Generate markdown table
  */
 function generateMarkdownTable(coverageResults) {
@@ -245,8 +278,28 @@ function generateMarkdownTable(coverageResults) {
         return null;
     }
 
+    const COVERAGE_THRESHOLD = 80;
+    const overallCoverage = calculateOverallCoverage(coverageResults);
+    const meetsThreshold = overallCoverage.pct >= COVERAGE_THRESHOLD;
+
     const lines = [
-        '### 📊 Code Coverage',
+        '## 📊 Code Coverage',
+        '',
+        `**Overall Coverage: ${overallCoverage.pct}%** (Threshold: ≥${COVERAGE_THRESHOLD}%)`,
+        '',
+        '| Metric | Coverage |',
+        '|--------|----------|',
+        `| Statements | ${formatBadgeInline(overallCoverage.statements)} |`,
+        `| Branches | ${formatBadgeInline(overallCoverage.branches)} |`,
+        `| Functions | ${formatBadgeInline(overallCoverage.functions)} |`,
+        `| Lines | ${formatBadgeInline(overallCoverage.lines)} |`,
+        '',
+        meetsThreshold 
+            ? '✅ **Coverage check passed** — PR can be merged'
+            : `❌ **Coverage check failed** — Minimum ${COVERAGE_THRESHOLD}% coverage required`,
+        '',
+        '<details>',
+        '<summary>📁 File-level Coverage Details</summary>',
         '',
         '| Project | File | Statements | Branches | Functions | Lines |',
         '|---------|------|------------|----------|-----------|-------|'
@@ -268,10 +321,12 @@ function generateMarkdownTable(coverageResults) {
     });
 
     lines.push('');
+    lines.push('</details>');
+    lines.push('');
     lines.push('_Coverage for changed lines only (diff coverage) - Statements / Branches / Functions / Lines_');
     lines.push('');
 
-    return lines.join('\n');
+    return { markdown: lines.join('\n'), meetsThreshold, overallPct: overallCoverage.pct };
 }
 
 /**
@@ -291,12 +346,30 @@ function formatBadge(coverage) {
 }
 
 /**
+ * Format coverage percentage for inline display with visual bar
+ */
+function formatBadgeInline(coverage) {
+    const pct = coverage.pct;
+    
+    let emoji;
+    if (pct >= 80) {
+        emoji = '🟢';
+    } else if (pct >= 50) {
+        emoji = '🟡';
+    } else {
+        emoji = '🔴';
+    }
+    
+    return `${emoji} ${pct}%`;
+}
+
+
+/**
  * Main function
  */
 function main() {
     // Check if ui-modules-to-test.json exists
     if (!fs.existsSync('ui-modules-to-test.json')) {
-        console.log('[parse-coverage] No ui-modules-to-test.json found - skipping coverage report');
         addSkipMessage('No test changes detected');
         return;
     }
@@ -305,7 +378,6 @@ function main() {
     const changedSourceFiles = modulesData.changedSourceFiles || [];
 
     if (changedSourceFiles.length === 0) {
-        console.log('[parse-coverage] No changed source files - skipping coverage report');
         addSkipMessage('No source files changed (only test files modified)');
         return;
     }
@@ -313,15 +385,13 @@ function main() {
     const coverageResults = parseCoverageResults();
 
     if (!coverageResults || coverageResults.length === 0) {
-        console.log('[parse-coverage] No coverage results to report');
         addSkipMessage('Coverage data not available');
         return;
     }
 
-    const markdownTable = generateMarkdownTable(coverageResults);
+    const result = generateMarkdownTable(coverageResults);
 
-    if (!markdownTable) {
-        console.log('[parse-coverage] Failed to generate markdown table');
+    if (!result) {
         return;
     }
 
@@ -329,17 +399,33 @@ function main() {
     let existingComment = '';
     if (fs.existsSync('ui-pr-comment.md')) {
         existingComment = fs.readFileSync('ui-pr-comment.md', 'utf8');
-        console.log('[parse-coverage] ✓ Appending to existing ui-pr-comment.md');
-    } else {
-        console.log('[parse-coverage] ✓ Creating new ui-pr-comment.md');
+        
+        // Update the status blockquote to include coverage
+        const coverageStatusText = result.meetsThreshold 
+            ? ` | ✅ Coverage: ${result.overallPct}%` 
+            : ` | ❌ Coverage: ${result.overallPct}%`;
+        
+        // Replace "> **✅ All Tests Passed**" or "> **❌ Tests Failed**" with version that includes coverage
+        existingComment = existingComment.replace(
+            /^> \*\*(✅ All Tests Passed|❌ Tests Failed)\*\*$/m,
+            `> **$1${coverageStatusText}**`
+        );
     }
 
-    const updatedComment = existingComment + '\n\n' + markdownTable;
+    const updatedComment = existingComment + '\n\n' + result.markdown;
     fs.writeFileSync('ui-pr-comment.md', updatedComment);
 
-    console.log('[parse-coverage] ========================================');
-    console.log('[parse-coverage] ✓ Coverage report added to ui-pr-comment.md');
-    console.log('[parse-coverage] ========================================');
+    // Log result
+    console.log(`\n${result.meetsThreshold ? '✅' : '❌'} Overall coverage: ${result.overallPct}% (threshold: ≥80%)`);
+
+    // Exit with error code if threshold not met
+    if (!result.meetsThreshold) {
+        console.log('❌ Coverage check failed - PR cannot be merged\n');
+        process.exit(1);
+    } else {
+        console.log('✅ Coverage check passed - PR can be merged\n');
+    }
+
 }
 
 /**
@@ -361,7 +447,6 @@ function addSkipMessage(reason) {
     const updatedComment = existingComment + '\n\n' + skipMessage;
     fs.writeFileSync('ui-pr-comment.md', updatedComment);
 
-    console.log('[parse-coverage] ✓ Skip message added to ui-pr-comment.md');
 }
 
 main();
