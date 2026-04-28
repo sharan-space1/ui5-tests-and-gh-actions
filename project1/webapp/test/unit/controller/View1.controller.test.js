@@ -20,6 +20,8 @@ sap.ui.define([
 		assert.strictEqual(oController.add(5, 3), 8, "5 + 3 = 8");
 		assert.strictEqual(oController.add(-5, 3), -2, "-5 + 3 = -2");
 		assert.strictEqual(oController.add(0, 0), 0, "0 + 0 = 0");
+		assert.strictEqual(oController.add(100, 200), 300, "100 + 200 = 300");
+		assert.strictEqual(oController.add(-10, -5), -15, "-10 + -5 = -15");
 	});
 
 	QUnit.test("subtract should return difference of two numbers", function (assert) {
@@ -27,6 +29,7 @@ sap.ui.define([
 		assert.strictEqual(oController.subtract(10, 3), 7, "10 - 3 = 7");
 		assert.strictEqual(oController.subtract(3, 10), -7, "3 - 10 = -7");
 		assert.strictEqual(oController.subtract(5, 5), 0, "5 - 5 = 0");
+		assert.strictEqual(oController.subtract(100, 50), 50, "100 - 50 = 50");
 	});
 
 	QUnit.test("multiply should return product of two numbers", function (assert) {
@@ -34,6 +37,8 @@ sap.ui.define([
 		assert.strictEqual(oController.multiply(5, 3), 15, "5 * 3 = 15");
 		assert.strictEqual(oController.multiply(-5, 3), -15, "-5 * 3 = -15");
 		assert.strictEqual(oController.multiply(0, 100), 0, "0 * 100 = 0");
+		assert.strictEqual(oController.multiply(7, 7), 49, "7 * 7 = 49");
+		assert.strictEqual(oController.multiply(-2, -3), 6, "-2 * -3 = 6");
 	});
 
 	QUnit.test("divide should return quotient of two numbers", function (assert) {
