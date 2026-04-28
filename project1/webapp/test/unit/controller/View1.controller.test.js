@@ -93,7 +93,16 @@ sap.ui.define([
 		assert.strictEqual(oController.formatBoolean(1), "Yes", "Truthy value formatted as Yes");
 		assert.strictEqual(oController.formatBoolean(0), "No", "Falsy value formatted as No");
 	});
-QUnit.module("View1 Controller - Validation Functions");
+
+	QUnit.test("formatDate should handle edge cases", function (assert) {
+		var oController = new Controller();
+		var futureDate = new Date("2030-12-31T23:59:59");
+		assert.strictEqual(oController.formatDate(futureDate), "2030-12-31", "Future date formatted correctly");
+		var pastDate = new Date("2000-01-01T00:00:00");
+		assert.strictEqual(oController.formatDate(pastDate), "2000-01-01", "Past date formatted correctly");
+	});
+
+	QUnit.module("View1 Controller - Validation Functions");
 
 	// Validation function tests
 	QUnit.test("isEmail should validate email addresses", function (assert) {
@@ -141,7 +150,15 @@ QUnit.module("View1 Controller - Validation Functions");
 		assert.notOk(oController.isPositive(-5), "-5 is not positive");
 		assert.notOk(oController.isPositive("5"), "String '5' is not a positive number");
 	});
-QUnit.module("View1 Controller - String Operations");
+
+	QUnit.test("isInRange should handle decimal ranges", function (assert) {
+		var oController = new Controller();
+		assert.ok(oController.isInRange(5.5, 5, 6), "5.5 is in range 5-6");
+		assert.ok(oController.isInRange(0.1, 0, 1), "0.1 is in range 0-1");
+		assert.notOk(oController.isInRange(6.1, 5, 6), "6.1 is not in range 5-6");
+	});
+
+	QUnit.module("View1 Controller - String Operations");
 
 	// String operation tests
 	QUnit.test("capitalize should capitalize first letter", function (assert) {
@@ -182,7 +199,16 @@ QUnit.module("View1 Controller - String Operations");
 		assert.strictEqual(oController.countWords("  multiple   spaces  between  "), 3, "Three words with extra spaces");
 		assert.strictEqual(oController.countWords(""), 0, "Empty string has 0 words");
 		assert.strictEqual(oController.countWords("   "), 0, "Whitespace only has 0 words");
-	});module("View1 Controller - Helper Functions");
+	});
+
+	QUnit.test("truncate should handle exact length strings", function (assert) {
+		var oController = new Controller();
+		assert.strictEqual(oController.truncate("Hello", 5), "Hello", "Exact length not truncated");
+		assert.strictEqual(oController.truncate("Test", 10), "Test", "Shorter than max not truncated");
+		assert.strictEqual(oController.truncate("LongString", 4), "Long...", "Longer than max truncated");
+	});
+
+	QUnit.module("View1 Controller - Helper Functions");
 
 	QUnit.
 
