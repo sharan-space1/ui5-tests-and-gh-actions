@@ -135,25 +135,51 @@ function getChangedLineRanges(filePath, baseRef, headRef) {
 function extractModuleAndTests(filePath, baseRef, headRef) {
     try {
         const content = fs.readFileSync(filePath, 'utf8');
-        // Extract module name
-        const moduleMatch = content.match(/QUnit\.module\s*\(\s*["']([^"']+)["']/);
-        if (!moduleMatch) {
+        
+        // Extract all modules with their line numbers
+        const modules = [];
+        const moduleRegex = /QUnit\.module\s*\(\s*["']([^"']+)["']/g;
+        let moduleMatch;
+        
+        while ((moduleMatch = moduleRegex.exec(content)) !== null) {
+            const moduleName = moduleMatch[1];
+            const beforeMatch = content.substring(0, moduleMatch.index);
+            const lineNumber = beforeMatch.split('\n').length;
+            
+            modules.push({
+                name: moduleName,
+                line: lineNumber
+            });
+        }
+        
+        if (modules.length === 0) {
             return null;
         }
-        const moduleName = moduleMatch[1];
+        
         // Get changed line ranges
         const changedRanges = getChangedLineRanges(filePath, baseRef, headRef);
+        
         // Extract all tests with their line numbers
         const tests = [];
         const testRegex = /QUnit\.test\s*\(\s*["']([^"']+)["']\s*,\s*function/g;
         let testMatch;
+        
         while ((testMatch = testRegex.exec(content)) !== null) {
             const testName = testMatch[1];
             const beforeMatch = content.substring(0, testMatch.index);
             const lineNumber = beforeMatch.split('\n').length;
+            
+            // Find which module this test belongs to
+            // The test belongs to the last module that appears before it
+            let moduleName = modules[0].name; // Default to first module
+            for (let i = modules.length - 1; i >= 0; i--) {
+                if (lineNumber > modules[i].line) {
+                    moduleName = modules[i].name;
+                    break;
+                }
+            }
+            
             // Check if this test is affected by changes
-            // Handle both additions (start <= end) and deletions (start > end)
-            // Also check within a 5-line buffer around changes
             const isChanged = changedRanges.length === 0 || 
                             changedRanges.some(range => {
                                 // For deletions (start > end), check if test is near the deletion point
@@ -163,16 +189,38 @@ function extractModuleAndTests(filePath, baseRef, headRef) {
                                 // For additions/modifications, check if line is within or near the range
                                 return (lineNumber >= range.start - 5 && lineNumber <= range.end + 5);
                             });
+            
             tests.push({
                 name: testName,
                 line: lineNumber,
+                module: moduleName,
                 changed: isChanged
             });
         }
+        
+        // Group tests by module
+        const moduleGroups = {};
+        tests.forEach(test => {
+            if (!moduleGroups[test.module]) {
+                moduleGroups[test.module] = {
+                    tests: [],
+                    changedTests: []
+                };
+            }
+            moduleGroups[test.module].tests.push(test.name);
+            if (test.changed) {
+                moduleGroups[test.module].changedTests.push(test.name);
+            }
+        });
+        
+        // Return array of modules with their tests
         return {
-            module: moduleName,
-            tests: tests,
-            changedTests: tests.filter(t => t.changed).map(t => t.name)
+            modules: Object.keys(moduleGroups).map(moduleName => ({
+                name: moduleName,
+                tests: moduleGroups[moduleName].tests,
+                changedTests: moduleGroups[moduleName].changedTests
+            })),
+            hasChanges: tests.some(t => t.changed)
         };
     } catch (error) {
         return null;
@@ -195,17 +243,19 @@ function main() {
         // Extract project name (first folder segment)
         const projectName = file.split('/')[0];
         const moduleInfo = extractModuleAndTests(file, baseRef, headRef);
-        if (moduleInfo) {
+        if (moduleInfo && moduleInfo.modules) {
             if (!projectModules[projectName]) {
                 projectModules[projectName] = [];
             }
-            projectModules[projectName].push({
-                file: file,
-                module: moduleInfo.module,
-                changedTests: moduleInfo.changedTests,
-                allTests: moduleInfo.tests.map(t => t.name)
+            // Add each module as a separate entry
+            moduleInfo.modules.forEach(module => {
+                projectModules[projectName].push({
+                    file: file,
+                    module: module.name,
+                    changedTests: module.changedTests,
+                    allTests: module.tests
+                });
             });
-        } else {
         }
     });
     // Add changed source files to output

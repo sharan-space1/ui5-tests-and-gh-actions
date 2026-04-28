@@ -163,6 +163,95 @@ sap.ui.define([
             return "Invalid";
           }
           return str1 + "&" + str2;
+        },
+
+        // Complex function for testing coverage
+        processUserData(userData) {
+          // Multiple branches and conditions
+          if (!userData) {
+            return { error: "No data provided", status: "error" };
+          }
+
+          if (typeof userData !== "object") {
+            return { error: "Invalid data type", status: "error" };
+          }
+
+          const result = {
+            status: "success",
+            data: {},
+            warnings: []
+          };
+
+          // Check name
+          if (!userData.name || userData.name.trim() === "") {
+            result.warnings.push("Name is missing");
+            result.data.name = "Unknown";
+          } else if (userData.name.length < 3) {
+            result.warnings.push("Name is too short");
+            result.data.name = userData.name;
+          } else if (userData.name.length > 50) {
+            result.warnings.push("Name is too long");
+            result.data.name = userData.name.substring(0, 50);
+          } else {
+            result.data.name = userData.name;
+          }
+
+          // Check age
+          if (!userData.age) {
+            result.warnings.push("Age is missing");
+            result.data.age = 0;
+          } else if (typeof userData.age !== "number") {
+            result.warnings.push("Age must be a number");
+            result.data.age = 0;
+          } else if (userData.age < 0) {
+            result.warnings.push("Age cannot be negative");
+            result.data.age = 0;
+          } else if (userData.age < 18) {
+            result.data.age = userData.age;
+            result.data.category = "minor";
+          } else if (userData.age >= 18 && userData.age < 65) {
+            result.data.age = userData.age;
+            result.data.category = "adult";
+          } else {
+            result.data.age = userData.age;
+            result.data.category = "senior";
+          }
+
+          // Check email
+          if (!userData.email) {
+            result.warnings.push("Email is missing");
+          } else if (!this.isEmail(userData.email)) {
+            result.warnings.push("Email format is invalid");
+          } else {
+            result.data.email = userData.email;
+          }
+
+          // Check role
+          if (userData.role) {
+            if (userData.role === "admin") {
+              result.data.permissions = ["read", "write", "delete", "admin"];
+            } else if (userData.role === "editor") {
+              result.data.permissions = ["read", "write"];
+            } else if (userData.role === "viewer") {
+              result.data.permissions = ["read"];
+            } else {
+              result.warnings.push("Unknown role, defaulting to viewer");
+              result.data.permissions = ["read"];
+            }
+          } else {
+            result.data.permissions = ["read"];
+          }
+
+          // Check status
+          if (userData.active === true) {
+            result.data.status = "active";
+          } else if (userData.active === false) {
+            result.data.status = "inactive";
+          } else {
+            result.data.status = "unknown";
+          }
+
+          return result;
         }
     });
 });
