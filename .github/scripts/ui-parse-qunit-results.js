@@ -105,10 +105,14 @@ function parseQUnitResults(logContent, moduleName) {
  */
 function generateMarkdownTable(projectModules, allTestResults) {
     let markdown = '# 🧪 UI Test Check\n\n';
-    // Calculate summary statistics
+    // Calculate summary statistics (only count modules with actual changed tests)
     const totalChanged = Object.entries(projectModules)
         .filter(([key]) => key !== 'changedSourceFiles')
-        .flatMap(([, modules]) => modules.flatMap(m => m.changedTests)).length;
+        .flatMap(([, modules]) => 
+            modules
+                .filter(m => m.changedTests && m.changedTests.length > 0)
+                .flatMap(m => m.changedTests)
+        ).length;
     const changedTests = allTestResults.filter(t => t.changed);
     const changedPassed = changedTests.filter(t => t.status === 'passed').length;
     const changedFailed = changedTests.filter(t => t.status === 'failed').length;
@@ -139,11 +143,13 @@ function generateMarkdownTable(projectModules, allTestResults) {
         });
         markdown += '\n</details>\n\n';
     }
-    // Collapsible: QUnit Modules
+    // Collapsible: QUnit Modules (only show modules with changed tests)
     const modulesList = Object.entries(projectModules)
         .filter(([key]) => key !== 'changedSourceFiles')
         .flatMap(([project, modules]) => 
-            modules.map(m => ({ project, ...m }))
+            modules
+                .filter(m => m.changedTests && m.changedTests.length > 0)
+                .map(m => ({ project, ...m }))
         );
     if (modulesList.length > 0) {
         markdown += '<details>\n';

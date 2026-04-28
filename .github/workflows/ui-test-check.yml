@@ -105,11 +105,11 @@ jobs:
             echo "Testing: $project"
             echo "=========================================="
             
-            # Get unique modules for this project
-            MODULES=$(echo "$MODULES_JSON" | jq -r ".\"$project\" | map(.module) | unique | join(\",\")")
+            # Get unique modules for this project that have changed tests
+            MODULES=$(echo "$MODULES_JSON" | jq -r ".\"$project\" | map(select(.changedTests | length > 0)) | map(.module) | unique | join(\",\")")
             
             if [ -z "$MODULES" ]; then
-              echo "No modules found for $project"
+              echo "No modules with changed tests found for $project"
               continue
             fi
             
