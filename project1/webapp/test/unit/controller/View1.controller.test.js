@@ -210,8 +210,6 @@ sap.ui.define([
 
 	QUnit.module("View1 Controller - Helper Functions");
 
-	QUnit.
-
 	QUnit.test("something1 should concatenate strings with plus sign", function (assert) {
 		var oController = new Controller();
 		assert.strictEqual(oController.something1("hello", "world"), "hello+world", "Two strings concatenated with +");
