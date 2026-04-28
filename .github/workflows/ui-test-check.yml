@@ -56,12 +56,20 @@ jobs:
           echo "test_count=$TEST_PROJECTS" >> $GITHUB_OUTPUT
           
           # Decision logic
-          if [ "$SOURCE_COUNT" -eq 0 ]; then
-            # No source files changed - skip tests even if test files changed
-            echo "✓ No source files changed - skipping test execution"
+          if [ "$SOURCE_COUNT" -eq 0 ] && [ "$TEST_PROJECTS" -eq 0 ]; then
+            # No changes at all - skip everything
+            echo "✓ No source or test files changed - skipping"
             echo "has_source_changes=false" >> $GITHUB_OUTPUT
             echo "should_run_tests=false" >> $GITHUB_OUTPUT
+            echo "should_check_coverage=false" >> $GITHUB_OUTPUT
             echo "validation_status=skipped" >> $GITHUB_OUTPUT
+          elif [ "$SOURCE_COUNT" -eq 0 ] && [ "$TEST_PROJECTS" -gt 0 ]; then
+            # Only test files changed - run tests but skip coverage
+            echo "✓ Only test files changed - running tests without coverage check"
+            echo "has_source_changes=false" >> $GITHUB_OUTPUT
+            echo "should_run_tests=true" >> $GITHUB_OUTPUT
+            echo "should_check_coverage=false" >> $GITHUB_OUTPUT
+            echo "validation_status=tests_only" >> $GITHUB_OUTPUT
           elif [ "$TEST_PROJECTS" -eq 0 ]; then
             # Source files changed but no tests found - FAIL
             echo "❌ ERROR: JavaScript source files were changed but no test files were found."
@@ -71,12 +79,14 @@ jobs:
             cat ui-modules-to-test.json | jq -r '.changedSourceFiles[] | "  - \(.project)/\(.file)"'
             echo "has_source_changes=true" >> $GITHUB_OUTPUT
             echo "should_run_tests=false" >> $GITHUB_OUTPUT
+            echo "should_check_coverage=false" >> $GITHUB_OUTPUT
             echo "validation_status=failed" >> $GITHUB_OUTPUT
           else
-            # Source files changed AND tests exist - proceed
-            echo "✓ Source files changed with corresponding tests - proceeding with test execution"
+            # Source files changed AND tests exist - proceed with coverage
+            echo "✓ Source files changed with corresponding tests - proceeding with test execution and coverage"
             echo "has_source_changes=true" >> $GITHUB_OUTPUT
             echo "should_run_tests=true" >> $GITHUB_OUTPUT
+            echo "should_check_coverage=true" >> $GITHUB_OUTPUT
             echo "validation_status=passed" >> $GITHUB_OUTPUT
           fi
       
@@ -156,14 +166,14 @@ jobs:
       
       - name: Parse coverage results
         id: coverage
-        if: steps.extract.outputs.should_run_tests == 'true'
+        if: steps.extract.outputs.should_run_tests == 'true' && steps.extract.outputs.should_check_coverage == 'true'
         continue-on-error: true
         run: |
           node .github/scripts/ui-parse-coverage-results.js
       
       - name: Check for coverage bypass label
         id: check_bypass
-        if: steps.extract.outputs.should_run_tests == 'true'
+        if: steps.extract.outputs.should_run_tests == 'true' && steps.extract.outputs.should_check_coverage == 'true'
         uses: actions/github-script@v7
         with:
           script: |
@@ -205,10 +215,26 @@ jobs:
             } else if (validationStatus === 'skipped') {
               // No source changes - create info comment
               commentBody = `# 🧪 UI Test Check\n\n` +
-                           `## ℹ️ No Source Changes\n\n` +
-                           `**No source files were modified in this PR.**\n\n` +
-                           `Test execution was skipped as no JavaScript source code changes were detected. ` +
-                           `Tests only run when source files in \`webapp/controller/\`, \`webapp/model/\`, or \`Component.js\` are modified.`;
+                           `## ℹ️ No Changes Detected\n\n` +
+                           `**No source or test files were modified in this PR.**\n\n` +
+                           `Test execution was skipped as no changes were detected.`;
+            } else if (validationStatus === 'tests_only') {
+              // Only test files changed
+              commentBody = fs.existsSync('ui-pr-comment.md') ? 
+                           fs.readFileSync('ui-pr-comment.md', 'utf8') : 
+                           `# 🧪 UI Test Check\n\n## ✅ Test Files Modified\n\n**Only test files were modified - no source changes detected.**\n\n`;
+              
+              // Add note about coverage being skipped
+              if (commentBody.includes('📊 Summary')) {
+                commentBody = commentBody.replace(
+                  '## 📊 Summary',
+                  '> ℹ️ **Coverage Check Skipped**\n' +
+                  '> \n' +
+                  '> No source files were changed in this PR, only test files.\n' +
+                  '> Coverage check is skipped but tests were executed to verify they pass.\n\n' +
+                  '## 📊 Summary'
+                );
+              }
             } else if (fs.existsSync('ui-pr-comment.md')) {
               // Tests ran successfully
               commentBody = fs.readFileSync('ui-pr-comment.md', 'utf8');
