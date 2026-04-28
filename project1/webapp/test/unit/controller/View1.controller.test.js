@@ -5,7 +5,7 @@ sap.ui.define([
 ], function (Controller) {
 	"use strict";
 
-	QUnit.module("View1 Controller");
+	QUnit.module("View1 Controller - Basic Tests");
 
 	QUnit.test("I should test the View1 controller", function (assert) {
 		var oAppController = new Controller();
@@ -13,7 +13,8 @@ sap.ui.define([
 		assert.ok(oAppController);
 	});
 
-	// Calculation function tests
+	QUnit.module("View1 Controller - Calculation Functions");
+
 	QUnit.test("add should return sum of two numbers", function (assert) {
 		var oController = new Controller();
 		assert.strictEqual(oController.add(5, 3), 8, "5 + 3 = 8");
@@ -49,7 +50,8 @@ sap.ui.define([
 		assert.strictEqual(oController.percentage(50, 0), 0, "Division by zero returns 0");
 	});
 
-	// Formatting function tests
+	QUnit.module("View1 Controller - Formatting Functions");
+
 	QUnit.test("formatDate should format date correctly", function (assert) {
 		var oController = new Controller();
 		var date = new Date("2026-04-21T10:30:00");
@@ -86,6 +88,7 @@ sap.ui.define([
 		assert.strictEqual(oController.formatBoolean(1), "Yes", "Truthy value formatted as Yes");
 		assert.strictEqual(oController.formatBoolean(0), "No", "Falsy value formatted as No");
 	});
+QUnit.module("View1 Controller - Validation Functions");
 
 	// Validation function tests
 	QUnit.test("isEmail should validate email addresses", function (assert) {
@@ -133,6 +136,7 @@ sap.ui.define([
 		assert.notOk(oController.isPositive(-5), "-5 is not positive");
 		assert.notOk(oController.isPositive("5"), "String '5' is not a positive number");
 	});
+QUnit.module("View1 Controller - String Operations");
 
 	// String operation tests
 	QUnit.test("capitalize should capitalize first letter", function (assert) {
@@ -173,7 +177,9 @@ sap.ui.define([
 		assert.strictEqual(oController.countWords("  multiple   spaces  between  "), 3, "Three words with extra spaces");
 		assert.strictEqual(oController.countWords(""), 0, "Empty string has 0 words");
 		assert.strictEqual(oController.countWords("   "), 0, "Whitespace only has 0 words");
-	});
+	});module("View1 Controller - Helper Functions");
+
+	QUnit.
 
 	QUnit.test("something1 should concatenate strings with plus sign", function (assert) {
 		var oController = new Controller();
@@ -220,7 +226,8 @@ sap.ui.define([
 		assert.strictEqual(oController.something4(undefined, undefined), "Invalid", "Undefined first parameter returns Invalid");
 	});
 
-	// Test for processUserData - PARTIAL COVERAGE (intentionally incomplete)
+	QUnit.module("View1 Controller - User Data Processing");
+
 	QUnit.test("processUserData should return error when no data provided", function (assert) {
 		var oController = new Controller();
 		var result = oController.processUserData(null);
