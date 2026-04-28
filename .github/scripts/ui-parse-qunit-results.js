@@ -128,7 +128,7 @@ function generateMarkdownTable(projectModules, allTestResults) {
     }
     // Total changed summary
     markdown += `## 📊 Summary\n\n`;
-    markdown += `- **Total Tests:** ${totalPassed}/${totalTests} passed`;
+    markdown += `- **Total Tests:** ${totalPassed}/${totalTests} passed (from changed modules)`;
     if (regressions.length > 0) {
         markdown += ` • ⚠️ ${regressions.length} regression(s)`;
     }
@@ -189,7 +189,7 @@ function main() {
     if (projectKeys.length === 0) {
         process.exit(0);
     }
-    // Read test results from all projects
+    // Read test results from all projects (only for modules with changed tests)
     const allResults = [];
     Object.entries(projectModules)
         .filter(([key]) => key !== 'changedSourceFiles') // Skip non-project keys
@@ -197,7 +197,11 @@ function main() {
         const logFile = `${project}-ui-test-output.log`;
         if (fs.existsSync(logFile)) {
             const logContent = fs.readFileSync(logFile, 'utf8');
-            modules.forEach(moduleInfo => {
+            
+            // Only process modules that have changed tests
+            const modulesWithChanges = modules.filter(m => m.changedTests && m.changedTests.length > 0);
+            
+            modulesWithChanges.forEach(moduleInfo => {
                 // Parse results for this module
                 const results = parseQUnitResults(logContent, moduleInfo.module);
                 // Mark which tests were changed
