@@ -1,8 +1,14 @@
 const { spawn } = require('child_process');
 const http = require('http');
 const kill = require('tree-kill');
+const path = require('path');
 let serverProcess;
 const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+
+// Get project root directory (2 levels up from this file: project1/)
+const projectRoot = path.resolve(__dirname, '../..');
+const configPath = path.relative(projectRoot, path.join(__dirname, 'wdio.conf.js'));
+
 // Check if server is running
 function isServerRunning() {
     return new Promise((resolve) => {
@@ -42,10 +48,10 @@ async function startServer() {
 function runTests() {
     console.log('Running tests...\n');
     return new Promise((resolve, reject) => {
-        const wdio = spawn('npx', ['wdio', 'run', './wdio.conf.js'], {
+        const wdio = spawn('npx', ['wdio', 'run', configPath], {
             shell: true,
             stdio: 'inherit',
-            cwd: __dirname
+            cwd: projectRoot
         });
         wdio.on('close', (code) => {
             resolve(code === 0);
