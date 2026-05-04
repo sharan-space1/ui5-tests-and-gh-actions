@@ -158,6 +158,16 @@ sap.ui.define([
 		assert.notOk(oController.isInRange(6.1, 5, 6), "6.1 is not in range 5-6");
 	});
 
+	QUnit.test("isStrongPassword should validate password strength", function (assert) {
+		var oController = new Controller();
+		assert.ok(oController.isStrongPassword("Abc123!@#"), "Password with all requirements is strong");
+		assert.ok(oController.isStrongPassword("MyP@ssw0rd"), "Valid strong password");
+		assert.notOk(oController.isStrongPassword("password"), "Password without uppercase, number, and special char is weak");
+		assert.notOk(oController.isStrongPassword("PASSWORD123!"), "Password without lowercase is weak");
+		assert.notOk(oController.isStrongPassword("Pass!"), "Password too short is weak");
+		assert.notOk(oController.isStrongPassword(123), "Non-string is weak");
+	});
+
 	QUnit.module("View1 Controller - String Operations");
 
 	// String operation tests
@@ -206,6 +216,15 @@ sap.ui.define([
 		assert.strictEqual(oController.truncate("Hello", 5), "Hello", "Exact length not truncated");
 		assert.strictEqual(oController.truncate("Test", 10), "Test", "Shorter than max not truncated");
 		assert.strictEqual(oController.truncate("LongString", 4), "Long...", "Longer than max truncated");
+	});
+
+	QUnit.test("toTitleCase should convert strings to title case", function (assert) {
+		var oController = new Controller();
+		assert.strictEqual(oController.toTitleCase("hello world"), "Hello World", "Lowercase converted to title case");
+		assert.strictEqual(oController.toTitleCase("HELLO WORLD"), "Hello World", "Uppercase converted to title case");
+		assert.strictEqual(oController.toTitleCase("hello WORLD test"), "Hello World Test", "Mixed case converted to title case");
+		assert.strictEqual(oController.toTitleCase(""), "", "Empty string returns empty");
+		assert.strictEqual(oController.toTitleCase(123), "", "Non-string returns empty");
 	});
 
 	QUnit.module("View1 Controller - Helper Functions");
@@ -472,6 +491,21 @@ sap.ui.define([
 		assert.ok(result.warnings.includes("Age cannot be negative"), "Should warn about negative age");
 		assert.ok(result.warnings.includes("Email format is invalid"), "Should warn about invalid email");
 		assert.ok(result.warnings.includes("Unknown role, defaulting to viewer"), "Should warn about unknown role");
+	});
+
+	QUnit.module("View1 Controller - Number Check Functions");
+
+	QUnit.test("isEven should check if number is even", function (assert) {
+		var oController = new Controller();
+		assert.strictEqual(oController.isEven(2), true, "2 is even");
+		assert.strictEqual(oController.isEven(4), true, "4 is even");
+		assert.strictEqual(oController.isEven(0), true, "0 is even");
+		assert.strictEqual(oController.isEven(-2), true, "-2 is even");
+		assert.strictEqual(oController.isEven(1), false, "1 is not even");
+		assert.strictEqual(oController.isEven(3), false, "3 is not even");
+		assert.strictEqual(oController.isEven(-1), false, "-1 is not even");
+		assert.strictEqual(oController.isEven("2"), false, "String should return false");
+		assert.strictEqual(oController.isEven(null), false, "Null should return false");
 	});
 
 });

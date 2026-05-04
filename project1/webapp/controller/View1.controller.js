@@ -252,6 +252,36 @@ sap.ui.define([
           }
 
           return result;
+        },
+
+        // Validation function - validate password strength
+        isStrongPassword(password) {
+          if (typeof password !== "string" || password.length < 8) {
+            return false;
+          }
+          const hasUpperCase = /[A-Z]/.test(password);
+          const hasLowerCase = /[a-z]/.test(password);
+          const hasNumber = /[0-9]/.test(password);
+          const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+          return hasUpperCase && hasLowerCase && hasNumber && hasSpecialChar;
+        },
+
+        // String operation - convert to title case
+        toTitleCase(str) {
+          if (typeof str !== "string" || str.trim().length === 0) {
+            return "";
+          }
+          return str.toLowerCase().split(' ').map(word => {
+            return word.charAt(0).toUpperCase() + word.slice(1);
+          }).join(' ');
+        },
+
+        // New function - check if number is even
+        isEven(num) {
+          if (typeof num !== "number") {
+            return false;
+          }
+          return num % 2 === 0;
         }
     });
 });
