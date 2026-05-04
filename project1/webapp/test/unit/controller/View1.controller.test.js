@@ -493,4 +493,19 @@ sap.ui.define([
 		assert.ok(result.warnings.includes("Unknown role, defaulting to viewer"), "Should warn about unknown role");
 	});
 
+	QUnit.module("View1 Controller - Number Check Functions");
+
+	QUnit.test("isEven should check if number is even", function (assert) {
+		var oController = new Controller();
+		assert.strictEqual(oController.isEven(2), true, "2 is even");
+		assert.strictEqual(oController.isEven(4), true, "4 is even");
+		assert.strictEqual(oController.isEven(0), true, "0 is even");
+		assert.strictEqual(oController.isEven(-2), true, "-2 is even");
+		assert.strictEqual(oController.isEven(1), false, "1 is not even");
+		assert.strictEqual(oController.isEven(3), false, "3 is not even");
+		assert.strictEqual(oController.isEven(-1), false, "-1 is not even");
+		assert.strictEqual(oController.isEven("2"), false, "String should return false");
+		assert.strictEqual(oController.isEven(null), false, "Null should return false");
+	});
+
 });

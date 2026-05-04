@@ -274,6 +274,14 @@ sap.ui.define([
           return str.toLowerCase().split(' ').map(word => {
             return word.charAt(0).toUpperCase() + word.slice(1);
           }).join(' ');
+        },
+
+        // New function - check if number is even
+        isEven(num) {
+          if (typeof num !== "number") {
+            return false;
+          }
+          return num % 2 === 0;
         }
     });
 });

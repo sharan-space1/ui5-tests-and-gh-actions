@@ -111,6 +111,14 @@ sap.ui.define([
         joinArray(arr, separator = ",") {
             if (!Array.isArray(arr)) return "";
             return arr.join(separator);
+        },
+
+        // New function - check if number is even
+        isEven(num) {
+            if (typeof num !== "number") {
+                return false;
+            }
+            return num % 2 === 0;
         }
     });
 });
